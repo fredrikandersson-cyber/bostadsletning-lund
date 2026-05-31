@@ -1,0 +1,162 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String     @id @default(cuid())
+  email     String     @unique
+  password  String
+  fullName  String
+  familyId  String
+  family    Family     @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  role      String     @default("family_member") // parent, family_member, admin
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  applications Application[]
+  applicationHistory ApplicationHistory[]
+
+  @@index([familyId])
+  @@index([email])
+}
+
+model Family {
+  id        String     @id @default(cuid())
+  name      String
+  adminId   String
+  createdAt DateTime   @default(now())
+  users     User[]
+  applications Application[]
+
+  @@index([adminId])
+}
+
+model Listing {
+  id              String     @id @default(cuid())
+  externalId      String     // From Hemnet, Blocket, etc
+  source          String     // hemnet, blocket, booli
+  title           String
+  description     String?
+  price           Int        // Price in SEK/month
+  pricePerSqm     Int?
+  rooms           Int?
+  area            Float?
+  address         String
+  latitude        Float?
+  longitude       Float?
+  type            String     // apartment, house
+  landlordType    String     // private, company
+  imageUrl        String?
+  url             String     @unique
+  availableFrom   DateTime?
+  leaseType       String     @default("long_term") // long_term, short_term
+  leaseLength     Int?       // in months
+  hasKitchen      Boolean    @default(false)
+  hasFurnished    Boolean    @default(false)
+  hasBalcony      Boolean    @default(false)
+  petFriendly     Boolean    @default(false)
+  listedAt        DateTime
+  scrapedAt       DateTime   @default(now())
+  expiresAt       DateTime?
+  isActive        Boolean    @default(true)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  applications Application[]
+
+  @@unique([externalId, source])
+  @@index([isActive, createdAt])
+  @@index([address])
+  @@index([price])
+  @@index([rooms])
+  @@index([source])
+}
+
+model SearchFilter {
+  id                  String     @id @default(cuid())
+  userId              String
+  name                String
+  minPrice            Int?
+  maxPrice            Int?
+  minRooms            Int?
+  maxRooms            Int?
+  minArea             Float?
+  maxArea             Float?
+  areas               String[]   // Array of areas like ['Centrum', 'Norrby']
+  types               String[]   // ['apartment', 'house']
+  petFriendly         Boolean?
+  furnished           Boolean?
+  isActive            Boolean    @default(true)
+  notifyNewListings   Boolean    @default(true)
+  createdAt           DateTime   @default(now())
+
+  @@index([userId])
+}
+
+model Application {
+  id              String     @id @default(cuid())
+  familyId        String
+  family          Family     @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  listingId       String
+  listing         Listing    @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  userWhoApplied  String
+  user            User       @relation(fields: [userWhoApplied], references: [id], onDelete: Cascade)
+  status          String     @default("interested") // interested, applied, viewed, rejected, accepted
+  appliedAt       DateTime?
+  contactPhone    String?
+  contactEmail    String?
+  notes           String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  history ApplicationHistory[]
+
+  @@unique([familyId, listingId])
+  @@index([familyId])
+  @@index([listingId])
+  @@index([userWhoApplied])
+  @@index([status])
+}
+
+model ApplicationHistory {
+  id              String     @id @default(cuid())
+  applicationId   String
+  application     Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  changedBy       String
+  user            User       @relation(fields: [changedBy], references: [id], onDelete: Cascade)
+  oldStatus       String?
+  newStatus       String
+  notes           String?
+  changedAt       DateTime   @default(now())
+
+  @@index([applicationId])
+  @@index([changedBy])
+}
+
+model NotificationPreferences {
+  id                  String     @id @default(cuid())
+  userId              String     @unique
+  emailFrequency      String     @default("daily") // realtime, daily, weekly, none
+  dailyDigestTime     String     @default("08:00")
+  notifyNewListings   Boolean    @default(true)
+  notifyPriceDrop     Boolean    @default(false)
+  notifyStatusChange  Boolean    @default(true)
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+}
+
+model ApiPoll {
+  id              String     @id @default(cuid())
+  source          String     // hemnet, blocket
+  status          String     // success, error, rate_limited
+  listingsFound   Int
+  newListings     Int
+  errorMessage    String?
+  polledAt        DateTime   @default(now())
+  nextPollAt      DateTime
+}
