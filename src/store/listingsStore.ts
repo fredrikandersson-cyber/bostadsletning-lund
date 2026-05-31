@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Listing, SearchFilter } from '../types';
+import type { Listing, SearchFilter } from '../types';
 
 interface ListingsState {
   listings: Listing[];
