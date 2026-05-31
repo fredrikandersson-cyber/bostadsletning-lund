@@ -24,7 +24,7 @@ const DEFAULT_FILTERS: FilterValues = {
   selectedAreas: [],
   petFriendly: false,
   furnished: false,
-  sources: ['blocket', 'bostadsportal', 'qasa', 'hyresratter'],
+  sources: ['blocket', 'bostadsportal', 'qasa', 'hyresratter', 'lkf', 'afbostader', 'facebook'],
 };
 
 const SOURCE_OPTIONS = [

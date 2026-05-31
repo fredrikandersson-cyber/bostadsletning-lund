@@ -4,16 +4,18 @@ import type { FilterValues } from '../components/Listings/FilterPanel';
 import { ListingCard } from '../components/Listings/ListingCard';
 import { SourcesPanel } from '../components/SourcesPanel';
 import { AreasGuide } from '../components/AreasGuide';
+import { EmailSubscribe } from '../components/EmailSubscribe';
 import { MOCK_LISTINGS } from '../data/mockListings';
 import type { Listing } from '../types';
 
-type Tab = 'listings' | 'sources' | 'areas' | 'applications';
+type Tab = 'listings' | 'sources' | 'areas' | 'applications' | 'settings';
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: 'listings',     label: 'Annonser',   icon: '🏠' },
-  { id: 'sources',      label: 'Källor',     icon: '🔍' },
-  { id: 'areas',        label: 'Områden',    icon: '📍' },
-  { id: 'applications', label: 'Mina val',   icon: '📋' },
+  { id: 'listings',     label: 'Annonser',       icon: '🏠' },
+  { id: 'sources',      label: 'Källor',         icon: '🔍' },
+  { id: 'areas',        label: 'Områden',        icon: '📍' },
+  { id: 'applications', label: 'Mina val',       icon: '📋' },
+  { id: 'settings',     label: 'Notifikationer', icon: '📬' },
 ];
 
 const SORT_OPTIONS = [
@@ -70,7 +72,7 @@ export function Dashboard() {
     selectedAreas: [],
     petFriendly: false,
     furnished: false,
-    sources: ['blocket', 'bostadsportal', 'qasa', 'hyresratter'],
+    sources: ['blocket', 'bostadsportal', 'qasa', 'hyresratter', 'lkf', 'afbostader', 'facebook'],
   });
   const [sort, setSort] = useState('newest');
   const [showFilters, setShowFilters] = useState(false);
@@ -83,8 +85,7 @@ export function Dashboard() {
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-bold text-gray-900 leading-tight">Bostadsletning Lund</h1>
-            <p className="text-xs text-gray-500">Familjedashboard – hitta rätt boende</p>
+            <h1 className="text-lg font-bold text-gray-900 leading-tight">Hitta boende i Lund för I&amp;F</h1>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full border border-blue-100">
@@ -225,6 +226,21 @@ export function Dashboard() {
               <p className="text-gray-400 text-sm mt-1">
                 Gå till Annonser och markera dem du är intresserad av.
               </p>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'settings' && (
+          <div className="max-w-lg">
+            <div className="mb-6">
+              <h2 className="text-xl font-bold text-gray-900">Notifikationer</h2>
+              <p className="text-gray-600 text-sm mt-1">
+                Prenumerera på daglig sammanfattning eller direktnotis när nya annonser dyker upp.
+              </p>
+            </div>
+            <EmailSubscribe />
+            <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-700">
+              <strong>OBS:</strong> E-post kräver att backend-servern är igång (Railway). Se <code>SETUP.md</code> för deployment-instruktioner. Konfigurera <code>SENDGRID_API_KEY</code> eller SMTP i <code>.env</code>.
             </div>
           </div>
         )}

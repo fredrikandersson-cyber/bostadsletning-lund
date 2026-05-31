@@ -3,6 +3,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
+import nodemailer from 'nodemailer';
+import cron from 'node-cron';
 
 dotenv.config();
 
@@ -248,7 +250,201 @@ app.post('/api/routes/family/invite', authMiddleware, async (req: AuthRequest, r
   }
 });
 
-// Error handling
+// ── Email helpers ──────────────────────────────────────────────────────────────
+
+function createTransport() {
+  // Supports both Gmail/SMTP and SendGrid
+  if (process.env.SENDGRID_API_KEY) {
+    return nodemailer.createTransport({
+      host: 'smtp.sendgrid.net',
+      port: 587,
+      auth: { user: 'apikey', pass: process.env.SENDGRID_API_KEY },
+    });
+  }
+  // Fallback: generic SMTP (e.g. Gmail app-password)
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: Number(process.env.SMTP_PORT) || 587,
+    secure: false,
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
+}
+
+function buildDigestHtml(listings: any[], isRealtime = false): string {
+  const listingRows = listings.map((l) => `
+    <tr>
+      <td style="padding:12px 0;border-bottom:1px solid #f0f0f0">
+        <a href="${l.url}" style="font-weight:600;color:#2563eb;text-decoration:none">${l.title}</a><br>
+        <span style="color:#6b7280;font-size:13px">${l.address}</span><br>
+        <strong style="color:#1d4ed8">${l.price.toLocaleString('sv-SE')} kr/mån</strong>
+        ${l.rooms ? ` · ${l.rooms} rum` : ''}
+        ${l.area ? ` · ${l.area} m²` : ''}
+        <span style="display:inline-block;margin-left:8px;background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:999px;font-size:11px">${l.source}</span>
+      </td>
+    </tr>
+  `).join('');
+
+  const heading = isRealtime
+    ? '🏠 Ny bostad i Lund!'
+    : `🏠 Daglig sammanfattning – ${listings.length} nya bostäder`;
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <body style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#111">
+      <h1 style="font-size:22px;margin-bottom:4px">${heading}</h1>
+      <p style="color:#6b7280;margin-bottom:24px">Hitta boende i Lund för I&F</p>
+      <table width="100%" cellpadding="0" cellspacing="0">
+        ${listingRows}
+      </table>
+      <p style="margin-top:24px;font-size:12px;color:#9ca3af">
+        Du får det här mailet för att du prenumererar på bostadsnotiser.<br>
+        <a href="${process.env.APP_URL || 'http://localhost:5173'}" style="color:#2563eb">Öppna dashboarden →</a>
+      </p>
+    </body>
+    </html>
+  `;
+}
+
+async function sendDigestToSubscribers(isRealtime = false) {
+  const subscribers = await prisma.notificationPreferences.findMany({
+    where: {
+      emailFrequency: isRealtime ? 'realtime' : 'daily',
+      notifyNewListings: true,
+    },
+  });
+
+  if (subscribers.length === 0) return;
+
+  const since = new Date(Date.now() - (isRealtime ? 15 * 60 * 1000 : 24 * 60 * 60 * 1000));
+  const newListings = await prisma.listing.findMany({
+    where: { isActive: true, createdAt: { gte: since } },
+    orderBy: { createdAt: 'desc' },
+    take: 20,
+  });
+
+  if (newListings.length === 0) {
+    console.log('[email] No new listings, skipping digest');
+    return;
+  }
+
+  const transport = createTransport();
+  const html = buildDigestHtml(newListings, isRealtime);
+  const subject = isRealtime
+    ? `🏠 Ny bostad: ${newListings[0].title}`
+    : `🏠 ${newListings.length} nya bostäder i Lund idag`;
+
+  const fromEmail = process.env.SENDGRID_FROM_EMAIL || process.env.SMTP_USER || 'noreply@example.com';
+
+  for (const sub of subscribers) {
+    const user = await prisma.user.findUnique({ where: { id: sub.userId } });
+    if (!user?.email) continue;
+    try {
+      await transport.sendMail({
+        from: `"Hitta boende Lund" <${fromEmail}>`,
+        to: user.email,
+        subject,
+        html,
+      });
+      console.log(`[email] Sent digest to ${user.email}`);
+    } catch (err) {
+      console.error(`[email] Failed to send to ${user.email}:`, err);
+    }
+  }
+}
+
+// ── Email subscription endpoint ────────────────────────────────────────────────
+
+app.post('/api/email/subscribe', async (req: Request, res: Response) => {
+  try {
+    const { email, frequency } = req.body as { email: string; frequency: 'daily' | 'realtime' };
+
+    if (!email || !frequency) {
+      return res.status(400).json({ error: 'Email och frekvens krävs' });
+    }
+
+    // Find or create user by email (unauthenticated signup)
+    let user = await prisma.user.findUnique({ where: { email } });
+
+    if (!user) {
+      // Create a guest family + user
+      const family = await prisma.family.create({
+        data: { name: 'Gäst', adminId: 'pending' },
+      });
+      user = await prisma.user.create({
+        data: {
+          email,
+          password: '',
+          fullName: email,
+          familyId: family.id,
+          role: 'family_member',
+        },
+      });
+      await prisma.family.update({
+        where: { id: family.id },
+        data: { adminId: user.id },
+      });
+    }
+
+    // Upsert notification preferences
+    await prisma.notificationPreferences.upsert({
+      where: { userId: user.id },
+      create: {
+        userId: user.id,
+        emailFrequency: frequency,
+        notifyNewListings: true,
+      },
+      update: {
+        emailFrequency: frequency,
+        notifyNewListings: true,
+      },
+    });
+
+    // Send a welcome confirmation
+    try {
+      const transport = createTransport();
+      const fromEmail = process.env.SENDGRID_FROM_EMAIL || process.env.SMTP_USER || 'noreply@example.com';
+      await transport.sendMail({
+        from: `"Hitta boende Lund" <${fromEmail}>`,
+        to: email,
+        subject: '✅ Prenumeration aktiverad – Hitta boende i Lund',
+        html: `
+          <div style="font-family:system-ui,sans-serif;max-width:500px;margin:0 auto;padding:24px">
+            <h2>Prenumeration aktiverad!</h2>
+            <p>Du prenumererar nu på ${frequency === 'daily' ? 'daglig sammanfattning kl 08:00' : 'direktnotiser'} från <strong>Hitta boende i Lund för I&F</strong>.</p>
+            <p><a href="${process.env.APP_URL || 'http://localhost:5173'}" style="color:#2563eb">Öppna dashboarden →</a></p>
+          </div>
+        `,
+      });
+    } catch (emailErr) {
+      console.warn('[email] Welcome mail failed (check SMTP config):', emailErr);
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Subscribe error:', error);
+    res.status(500).json({ error: 'Kunde inte spara prenumeration' });
+  }
+});
+
+// ── Cron jobs ──────────────────────────────────────────────────────────────────
+
+// Daily digest: every day at 08:00
+cron.schedule('0 8 * * *', () => {
+  console.log('[cron] Running daily digest...');
+  sendDigestToSubscribers(false).catch(console.error);
+}, { timezone: 'Europe/Stockholm' });
+
+// Realtime check: every 15 minutes
+cron.schedule('*/15 * * * *', () => {
+  sendDigestToSubscribers(true).catch(console.error);
+});
+
+// ── Error handling ─────────────────────────────────────────────────────────────
+
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   console.error(err);
   res.status(500).json({ error: 'Internal server error' });
@@ -258,6 +454,7 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log('[cron] Daily digest scheduled at 08:00 Europe/Stockholm');
 });
 
 export default app;
