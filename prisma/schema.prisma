@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -87,8 +87,8 @@ model SearchFilter {
   maxRooms            Int?
   minArea             Float?
   maxArea             Float?
-  areas               String[]   // Array of areas like ['Centrum', 'Norrby']
-  types               String[]   // ['apartment', 'house']
+  areas               String?    // JSON string of areas: '["Centrum", "Norrby"]'
+  types               String?    // JSON string of types: '["apartment", "house"]'
   petFriendly         Boolean?
   furnished           Boolean?
   isActive            Boolean    @default(true)
