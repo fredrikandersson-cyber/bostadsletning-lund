@@ -36,7 +36,7 @@ export const RENTAL_SOURCES: RentalSource[] = [
       'Privata värdar kontaktas direkt via annons',
     ],
     integration: 'mock',
-    integrationNote: 'Kräver scraping av blocket.se/bostad – ingen officiell API. Tekniskt möjligt men kräver underhåll.',
+    integrationNote: 'Blocket hänvisar nu till Qasa för hyresrätter. Blocket.se/bostad är kvar men renderar client-side (kräver Playwright). Kolla Qasa-källan istället.',
   },
   {
     id: 'bostadsportal',
@@ -67,8 +67,8 @@ export const RENTAL_SOURCES: RentalSource[] = [
       'Säkra betalningar via Qasa-systemet',
       'Profiler för hyresvärdar skapar trygghet',
     ],
-    integration: 'mock',
-    integrationNote: 'Ingen publik API. Scraping möjlig men kräver login-session.',
+    integration: 'live',
+    integrationNote: 'LIVE via Qasa GraphQL API. Hämtar ~216 Lund-annonser var 15:e minut med areaIdentifier="se/lund". Ingen API-nyckel krävs.',
   },
   {
     id: 'hyresratter',
@@ -99,7 +99,7 @@ export const RENTAL_SOURCES: RentalSource[] = [
       'Gratis att stå i kön',
     ],
     integration: 'mock',
-    integrationNote: 'Ingen API. Scraping av lkf.se/lediga-lagenheter möjlig – enkel HTML-struktur.',
+    integrationNote: 'LKF använder Vitec Arena SPA – data laddas via AJAX efter sidan. Kräver Playwright för rendering. Playwright är installerat, scraper behöver kalibrering mot deras CSS-selektorer.',
   },
   {
     id: 'afbostader',

@@ -5,6 +5,9 @@ import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
 import cron from 'node-cron';
+import { scrapeBlocket } from './api/scrapers/blocket.js';
+import { scrapeLKF } from './api/scrapers/lkf.js';
+import { scrapeQasa } from './api/scrapers/qasa.js';
 
 dotenv.config();
 
@@ -309,6 +312,103 @@ function buildDigestHtml(listings: any[], isRealtime = false): string {
   `;
 }
 
+// ── Scraper helpers ────────────────────────────────────────────────────────────
+
+async function upsertListings(scraped: Awaited<ReturnType<typeof scrapeBlocket>>) {
+  let newCount = 0;
+  for (const item of scraped) {
+    try {
+      const existing = await prisma.listing.findUnique({
+        where: { externalId_source: { externalId: item.externalId, source: item.source } },
+      });
+
+      if (!existing) {
+        await prisma.listing.create({
+          data: {
+            externalId: item.externalId,
+            source: item.source,
+            title: item.title,
+            description: item.description,
+            price: item.price,
+            rooms: item.rooms,
+            area: item.area,
+            address: item.address,
+            imageUrl: item.imageUrl,
+            url: item.url,
+            type: 'apartment',
+            landlordType: item.landlordType,
+            petFriendly: item.petFriendly,
+            hasFurnished: item.hasFurnished,
+            hasBalcony: item.hasBalcony,
+            listedAt: item.listedAt,
+            leaseType: 'long_term',
+            isActive: true,
+          },
+        });
+        newCount++;
+      }
+    } catch (err) {
+      // Skip individual failures (e.g. duplicate URL constraint)
+      console.warn(`[scraper] skip ${item.externalId}:`, (err as Error).message);
+    }
+  }
+  return newCount;
+}
+
+async function runScrapers() {
+  // Share one browser instance across scrapers to save memory
+  const { chromium } = await import('playwright');
+  const browser = await chromium.launch({ headless: true });
+
+  try {
+    const results = await Promise.allSettled([
+      scrapeBlocket(browser as any).then(async (items) => {
+        const n = await upsertListings(items);
+        await prisma.apiPoll.create({
+          data: { source: 'blocket', status: 'success', listingsFound: items.length, newListings: n, nextPollAt: new Date(Date.now() + 15 * 60_000) },
+        });
+        console.log(`[blocket] ${items.length} fetched, ${n} new`);
+      }).catch(async (err) => {
+        await prisma.apiPoll.create({
+          data: { source: 'blocket', status: 'error', listingsFound: 0, newListings: 0, errorMessage: err.message, nextPollAt: new Date(Date.now() + 15 * 60_000) },
+        });
+        throw err;
+      }),
+      scrapeLKF(browser as any).then(async (items) => {
+        const n = await upsertListings(items);
+        await prisma.apiPoll.create({
+          data: { source: 'lkf', status: 'success', listingsFound: items.length, newListings: n, nextPollAt: new Date(Date.now() + 60 * 60_000) },
+        });
+        console.log(`[lkf] ${items.length} fetched, ${n} new`);
+      }).catch(async (err) => {
+        await prisma.apiPoll.create({
+          data: { source: 'lkf', status: 'error', listingsFound: 0, newListings: 0, errorMessage: err.message, nextPollAt: new Date(Date.now() + 60 * 60_000) },
+        });
+        throw err;
+      }),
+      // Qasa uses direct API - no browser needed
+      scrapeQasa().then(async (items) => {
+        const n = await upsertListings(items);
+        await prisma.apiPoll.create({
+          data: { source: 'qasa', status: 'success', listingsFound: items.length, newListings: n, nextPollAt: new Date(Date.now() + 15 * 60_000) },
+        });
+        console.log(`[qasa] ${items.length} fetched, ${n} new`);
+      }).catch(async (err) => {
+        await prisma.apiPoll.create({
+          data: { source: 'qasa', status: 'error', listingsFound: 0, newListings: 0, errorMessage: err.message, nextPollAt: new Date(Date.now() + 15 * 60_000) },
+        });
+        throw err;
+      }),
+    ]);
+
+    for (const r of results) {
+      if (r.status === 'rejected') console.error('[scraper] error:', r.reason);
+    }
+  } finally {
+    await browser.close();
+  }
+}
+
 async function sendDigestToSubscribers(isRealtime = false) {
   const subscribers = await prisma.notificationPreferences.findMany({
     where: {
@@ -430,7 +530,42 @@ app.post('/api/email/subscribe', async (req: Request, res: Response) => {
   }
 });
 
+// ── Manual scrape trigger (for testing) ───────────────────────────────────────
+
+app.post('/api/admin/scrape', async (req: Request, res: Response) => {
+  const secret = req.headers['x-admin-secret'];
+  if (secret !== process.env.ADMIN_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  try {
+    console.log('[admin] Manual scrape triggered');
+    runScrapers().catch(console.error);
+    res.json({ message: 'Scraping started in background' });
+  } catch (err) {
+    res.status(500).json({ error: 'Scrape failed' });
+  }
+});
+
+// Poll status endpoint
+app.get('/api/admin/poll-status', async (req: Request, res: Response) => {
+  try {
+    const polls = await prisma.apiPoll.findMany({
+      orderBy: { polledAt: 'desc' },
+      take: 20,
+    });
+    res.json({ polls });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch poll status' });
+  }
+});
+
 // ── Cron jobs ──────────────────────────────────────────────────────────────────
+
+// Scrape listings every 15 minutes
+cron.schedule('*/15 * * * *', () => {
+  console.log('[cron] Running scrapers...');
+  runScrapers().catch(console.error);
+});
 
 // Daily digest: every day at 08:00
 cron.schedule('0 8 * * *', () => {
@@ -438,7 +573,7 @@ cron.schedule('0 8 * * *', () => {
   sendDigestToSubscribers(false).catch(console.error);
 }, { timezone: 'Europe/Stockholm' });
 
-// Realtime check: every 15 minutes
+// Realtime notifications: every 15 minutes after scrape
 cron.schedule('*/15 * * * *', () => {
   sendDigestToSubscribers(true).catch(console.error);
 });
@@ -452,9 +587,13 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 
 // Start server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);
+  console.log('[cron] Scrapers scheduled every 15 min');
   console.log('[cron] Daily digest scheduled at 08:00 Europe/Stockholm');
+  // Run scrapers immediately on startup to populate initial data
+  console.log('[startup] Running initial scrape...');
+  runScrapers().catch(console.error);
 });
 
 export default app;

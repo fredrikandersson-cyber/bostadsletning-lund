@@ -37,17 +37,29 @@ export function IntegrationStatus() {
         ))}
       </div>
 
-      {/* Important notice */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6 flex gap-3">
-        <span className="text-xl shrink-0">⚠️</span>
-        <div>
-          <p className="font-semibold text-yellow-800 text-sm">Alla annonser i appen är just nu demodata</p>
-          <p className="text-yellow-700 text-xs mt-1">
-            Annonserna du ser är exempeldata för att visa hur appen fungerar. Ingen av källorna är ännu kopplad
-            till live-data. Se tabellen nedan för vad som krävs för att aktivera varje källa.
-          </p>
+      {/* Status notice */}
+      {counts.live > 0 ? (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6 flex gap-3">
+          <span className="text-xl shrink-0">✅</span>
+          <div>
+            <p className="font-semibold text-green-800 text-sm">{counts.live} käll{counts.live === 1 ? 'a' : 'or'} med live-data aktiv{counts.live === 1 ? '' : 'a'}</p>
+            <p className="text-green-700 text-xs mt-1">
+              Starta backend-servern (<code className="bg-green-100 px-1 rounded">npm run dev:server</code>) för att hämta riktiga annonser automatiskt.
+              Demodata visas tills servern körs och laddat in annonser i databasen.
+            </p>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6 flex gap-3">
+          <span className="text-xl shrink-0">⚠️</span>
+          <div>
+            <p className="font-semibold text-yellow-800 text-sm">Alla annonser i appen är just nu demodata</p>
+            <p className="text-yellow-700 text-xs mt-1">
+              Se tabellen nedan för vad som krävs för att aktivera varje källa.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Detail table */}
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
