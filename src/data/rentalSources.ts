@@ -116,8 +116,8 @@ export const RENTAL_SOURCES: RentalSource[] = [
       'Anmäl till kön INNAN antagningsbesked i juli',
       'Förnya köplatsen varje år',
     ],
-    integration: 'mock',
-    integrationNote: 'Ingen API. Scraping av afbostader.se/lediga-bostader möjlig.',
+    integration: 'live',
+    integrationNote: 'LIVE via REST API: afbostader.se/DiremoApi/redimo/rest/vacantproducts?lang=sv_SE&type=1. Returnerar ~81 lediga bostäder i Lund. Ingen auth krävs.',
   },
   {
     id: 'lundafastigheter',

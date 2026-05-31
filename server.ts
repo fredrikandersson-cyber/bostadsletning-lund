@@ -8,6 +8,7 @@ import cron from 'node-cron';
 import { scrapeBlocket } from './api/scrapers/blocket.js';
 import { scrapeLKF } from './api/scrapers/lkf.js';
 import { scrapeQasa } from './api/scrapers/qasa.js';
+import { scrapeAFBostader } from './api/scrapers/afbostader.js';
 
 dotenv.config();
 
@@ -386,7 +387,19 @@ async function runScrapers() {
         });
         throw err;
       }),
-      // Qasa uses direct API - no browser needed
+      scrapeAFBostader().then(async (items) => {
+        const n = await upsertListings(items);
+        await prisma.apiPoll.create({
+          data: { source: 'afbostader', status: 'success', listingsFound: items.length, newListings: n, nextPollAt: new Date(Date.now() + 60 * 60_000) },
+        });
+        console.log(`[afbostader] ${items.length} fetched, ${n} new`);
+      }).catch(async (err) => {
+        await prisma.apiPoll.create({
+          data: { source: 'afbostader', status: 'error', listingsFound: 0, newListings: 0, errorMessage: err.message, nextPollAt: new Date(Date.now() + 60 * 60_000) },
+        });
+        console.error('[afbostader]', err.message);
+      }),
+      // Qasa uses direct GraphQL API - no browser needed
       scrapeQasa().then(async (items) => {
         const n = await upsertListings(items);
         await prisma.apiPoll.create({

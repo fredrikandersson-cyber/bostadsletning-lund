@@ -14,7 +14,7 @@ export interface FilterValues {
   sources: string[];
 }
 
-const DEFAULT_FILTERS: FilterValues = {
+const DEFAULT: FilterValues = {
   minPrice: 0,
   maxPrice: 20000,
   minRooms: 1,
@@ -28,264 +28,214 @@ const DEFAULT_FILTERS: FilterValues = {
 };
 
 const SOURCE_OPTIONS = [
-  { id: 'blocket', label: 'Blocket' },
-  { id: 'bostadsportal', label: 'Bostadsportal' },
-  { id: 'qasa', label: 'Qasa' },
-  { id: 'hyresratter', label: 'Hyresrätter.se' },
-  { id: 'lkf', label: 'LKF' },
-  { id: 'afbostader', label: 'AF Bostäder' },
-  { id: 'facebook', label: 'Facebook' },
+  { id: 'qasa',          label: 'Qasa',          live: true },
+  { id: 'afbostader',    label: 'AF Bostäder',    live: true },
+  { id: 'lkf',           label: 'LKF',            live: false },
+  { id: 'blocket',       label: 'Blocket',        live: false },
+  { id: 'bostadsportal', label: 'Bostadsportal',  live: false },
+  { id: 'hyresratter',   label: 'Hyresrätter',    live: false },
+  { id: 'facebook',      label: 'Facebook',       live: false },
 ];
 
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2.5">{title}</p>
+      {children}
+    </div>
+  );
+}
+
 interface FilterPanelProps {
-  onFilterChange: (filters: FilterValues) => void;
+  onFilterChange: (f: FilterValues) => void;
 }
 
 export function FilterPanel({ onFilterChange }: FilterPanelProps) {
-  const [filters, setFilters] = useState<FilterValues>(DEFAULT_FILTERS);
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [f, setF] = useState<FilterValues>(DEFAULT);
 
   const update = (partial: Partial<FilterValues>) => {
-    const next = { ...filters, ...partial };
-    setFilters(next);
+    const next = { ...f, ...partial };
+    setF(next);
     onFilterChange(next);
   };
 
-  const toggleArea = (areaName: string) => {
-    const selected = filters.selectedAreas.includes(areaName)
-      ? filters.selectedAreas.filter((a) => a !== areaName)
-      : [...filters.selectedAreas, areaName];
-    update({ selectedAreas: selected });
-  };
+  const toggleArea = (name: string) =>
+    update({ selectedAreas: f.selectedAreas.includes(name) ? f.selectedAreas.filter(a => a !== name) : [...f.selectedAreas, name] });
 
-  const toggleSource = (sourceId: string) => {
-    const sources = filters.sources.includes(sourceId)
-      ? filters.sources.filter((s) => s !== sourceId)
-      : [...filters.sources, sourceId];
-    update({ sources });
-  };
-
-  const reset = () => {
-    setFilters(DEFAULT_FILTERS);
-    onFilterChange(DEFAULT_FILTERS);
-  };
+  const toggleSource = (id: string) =>
+    update({ sources: f.sources.includes(id) ? f.sources.filter(s => s !== id) : [...f.sources, id] });
 
   const activeCount =
-    (filters.selectedAreas.length > 0 ? 1 : 0) +
-    (filters.minPrice > 0 || filters.maxPrice < 20000 ? 1 : 0) +
-    (filters.minRooms > 1 || filters.maxRooms < 5 ? 1 : 0) +
-    (filters.minArea > 0 || filters.maxArea < 150 ? 1 : 0) +
-    (filters.petFriendly ? 1 : 0) +
-    (filters.furnished ? 1 : 0);
+    (f.selectedAreas.length ? 1 : 0) +
+    (f.minPrice > 0 || f.maxPrice < 20000 ? 1 : 0) +
+    (f.minRooms > 1 || f.maxRooms < 5 ? 1 : 0) +
+    (f.minArea > 0 || f.maxArea < 150 ? 1 : 0) +
+    (f.petFriendly ? 1 : 0) +
+    (f.furnished ? 1 : 0);
+
+  const reset = () => { setF(DEFAULT); onFilterChange(DEFAULT); };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       {/* Header */}
-      <div
-        className="flex items-center justify-between px-5 py-4 cursor-pointer select-none"
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
+      <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
           </svg>
-          <span className="font-semibold text-gray-800">Filter</span>
+          <span className="font-semibold text-gray-900 text-sm">Sök &amp; filtrera</span>
           {activeCount > 0 && (
-            <span className="bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium">
+            <span className="bg-[#1c2b3a] text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium">
               {activeCount}
             </span>
           )}
         </div>
-        <div className="flex items-center gap-3">
-          {activeCount > 0 && (
-            <button
-              onClick={(e) => { e.stopPropagation(); reset(); }}
-              className="text-xs text-gray-500 hover:text-red-600 transition"
-            >
-              Rensa
-            </button>
-          )}
-          <svg
-            className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-            fill="none" viewBox="0 0 24 24" stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </div>
+        {activeCount > 0 && (
+          <button onClick={reset} className="text-xs text-gray-400 hover:text-red-500 transition font-medium">
+            Rensa
+          </button>
+        )}
       </div>
 
-      {isExpanded && (
-        <div className="px-5 pb-5 space-y-6 border-t border-gray-100 pt-4">
+      <div className="px-5 py-5 space-y-6">
 
-          {/* Hyra per månad */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Hyra per månad: {filters.minPrice.toLocaleString('sv-SE')} – {filters.maxPrice.toLocaleString('sv-SE')} kr
-            </label>
-            <div className="flex gap-3">
-              <input
-                type="number"
-                value={filters.minPrice}
-                onChange={(e) => update({ minPrice: Number(e.target.value) })}
-                min={0}
-                max={filters.maxPrice}
-                step={500}
-                className="w-1/2 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Min"
-              />
-              <input
-                type="number"
-                value={filters.maxPrice}
-                onChange={(e) => update({ maxPrice: Number(e.target.value) })}
-                min={filters.minPrice}
-                max={30000}
-                step={500}
-                className="w-1/2 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Max"
-              />
+        {/* Hyra */}
+        <Section title="Hyra per månad">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs text-gray-600">
+              <span>{f.minPrice.toLocaleString('sv-SE')} kr</span>
+              <span>{f.maxPrice === 20000 ? '20 000+' : f.maxPrice.toLocaleString('sv-SE')} kr</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <input type="number" value={f.minPrice} min={0} max={f.maxPrice} step={500}
+                onChange={e => update({ minPrice: +e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1c2b3a] focus:border-transparent"
+                placeholder="Min kr" />
+              <input type="number" value={f.maxPrice} min={f.minPrice} max={30000} step={500}
+                onChange={e => update({ maxPrice: +e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1c2b3a] focus:border-transparent"
+                placeholder="Max kr" />
             </div>
           </div>
+        </Section>
 
-          {/* Antal rum */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Antal rum: {filters.minRooms} – {filters.maxRooms === 5 ? '5+' : filters.maxRooms}
-            </label>
-            <div className="flex gap-2">
-              {[1, 2, 3, 4, 5].map((n) => {
-                const inRange = n >= filters.minRooms && n <= filters.maxRooms;
-                return (
-                  <button
-                    key={n}
-                    onClick={() => {
-                      if (filters.minRooms === n && filters.maxRooms === n) {
-                        update({ minRooms: 1, maxRooms: 5 });
-                      } else if (n < filters.minRooms) {
-                        update({ minRooms: n });
-                      } else if (n > filters.maxRooms) {
-                        update({ maxRooms: n });
-                      } else {
-                        update({ minRooms: n, maxRooms: n });
-                      }
-                    }}
-                    className={`flex-1 py-2 rounded-lg text-sm font-medium border transition ${
-                      inRange
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
-                    }`}
-                  >
-                    {n === 5 ? '5+' : n}
-                  </button>
-                );
-              })}
-            </div>
+        {/* Rum */}
+        <Section title="Antal rum">
+          <div className="flex gap-1.5">
+            {[1, 2, 3, 4, 5].map(n => {
+              const active = n >= f.minRooms && n <= f.maxRooms;
+              return (
+                <button key={n}
+                  onClick={() => {
+                    if (f.minRooms === n && f.maxRooms === n) update({ minRooms: 1, maxRooms: 5 });
+                    else if (n < f.minRooms) update({ minRooms: n });
+                    else if (n > f.maxRooms) update({ maxRooms: n });
+                    else update({ minRooms: n, maxRooms: n });
+                  }}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${
+                    active
+                      ? 'bg-[#1c2b3a] text-white'
+                      : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-100'
+                  }`}>
+                  {n === 5 ? '5+' : n}
+                </button>
+              );
+            })}
           </div>
+        </Section>
 
-          {/* Kvadratmeter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Storlek: {filters.minArea} – {filters.maxArea === 150 ? '150+' : filters.maxArea} m²
-            </label>
-            <div className="flex gap-3">
-              <input
-                type="number"
-                value={filters.minArea}
-                onChange={(e) => update({ minArea: Number(e.target.value) })}
-                min={0}
-                max={filters.maxArea}
-                step={5}
-                className="w-1/2 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Min m²"
-              />
-              <input
-                type="number"
-                value={filters.maxArea}
-                onChange={(e) => update({ maxArea: Number(e.target.value) })}
-                min={filters.minArea}
-                max={300}
-                step={5}
-                className="w-1/2 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Max m²"
-              />
-            </div>
+        {/* Storlek */}
+        <Section title="Storlek (m²)">
+          <div className="grid grid-cols-2 gap-2">
+            <input type="number" value={f.minArea} min={0} max={f.maxArea} step={5}
+              onChange={e => update({ minArea: +e.target.value })}
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1c2b3a] focus:border-transparent"
+              placeholder="Min m²" />
+            <input type="number" value={f.maxArea} min={f.minArea} max={300} step={5}
+              onChange={e => update({ maxArea: +e.target.value })}
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1c2b3a] focus:border-transparent"
+              placeholder="Max m²" />
           </div>
+        </Section>
 
-          {/* Områden */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Områden i Lund {filters.selectedAreas.length > 0 && `(${filters.selectedAreas.length} valda)`}
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {LUND_AREAS.map((area) => {
-                const selected = filters.selectedAreas.includes(area.name);
-                return (
-                  <button
-                    key={area.id}
-                    onClick={() => toggleArea(area.name)}
-                    title={area.description}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition ${
-                      selected
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
-                    }`}
-                  >
-                    {area.name}
-                  </button>
-                );
-              })}
-            </div>
+        {/* Områden */}
+        <Section title={`Område i Lund${f.selectedAreas.length ? ` (${f.selectedAreas.length})` : ''}`}>
+          <div className="flex flex-wrap gap-1.5">
+            {LUND_AREAS.map(area => {
+              const sel = f.selectedAreas.includes(area.name);
+              return (
+                <button key={area.id} onClick={() => toggleArea(area.name)} title={area.description}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${
+                    sel
+                      ? 'bg-[#1c2b3a] text-white'
+                      : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-100'
+                  }`}>
+                  {area.name}
+                </button>
+              );
+            })}
           </div>
+        </Section>
 
-          {/* Önskemål */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Önskemål</label>
-            <div className="flex gap-3">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={filters.petFriendly}
-                  onChange={(e) => update({ petFriendly: e.target.checked })}
-                  className="w-4 h-4 text-blue-600 rounded"
-                />
-                <span className="text-sm text-gray-700">Husdjur OK</span>
+        {/* Önskemål */}
+        <Section title="Önskemål">
+          <div className="space-y-2">
+            {[
+              { key: 'petFriendly', label: 'Husdjur tillåtet' },
+              { key: 'furnished',   label: 'Möblerad' },
+            ].map(opt => (
+              <label key={opt.key} className="flex items-center gap-3 cursor-pointer group">
+                <div className={`w-5 h-5 rounded flex items-center justify-center transition border ${
+                  f[opt.key as keyof FilterValues]
+                    ? 'bg-[#1c2b3a] border-[#1c2b3a]'
+                    : 'bg-white border-gray-300 group-hover:border-gray-500'
+                }`}
+                  onClick={() => update({ [opt.key]: !f[opt.key as keyof FilterValues] })}>
+                  {f[opt.key as keyof FilterValues] && (
+                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </div>
+                <span className="text-sm text-gray-700">{opt.label}</span>
               </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={filters.furnished}
-                  onChange={(e) => update({ furnished: e.target.checked })}
-                  className="w-4 h-4 text-blue-600 rounded"
-                />
-                <span className="text-sm text-gray-700">Möblerad</span>
-              </label>
-            </div>
+            ))}
           </div>
+        </Section>
 
-          {/* Källor */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Källor att visa</label>
-            <div className="flex flex-wrap gap-2">
-              {SOURCE_OPTIONS.map((src) => {
-                const selected = filters.sources.includes(src.id);
-                return (
-                  <button
-                    key={src.id}
-                    onClick={() => toggleSource(src.id)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition ${
-                      selected
-                        ? 'bg-green-600 text-white border-green-600'
-                        : 'bg-white text-gray-500 border-gray-300 hover:border-green-400'
-                    }`}
-                  >
-                    {src.label}
-                  </button>
-                );
-              })}
-            </div>
+        {/* Källor */}
+        <Section title="Visa källor">
+          <div className="space-y-1.5">
+            {SOURCE_OPTIONS.map(src => {
+              const sel = f.sources.includes(src.id);
+              return (
+                <label key={src.id} className="flex items-center gap-3 cursor-pointer group">
+                  <div className={`w-5 h-5 rounded flex items-center justify-center transition border ${
+                    sel
+                      ? 'bg-[#1c2b3a] border-[#1c2b3a]'
+                      : 'bg-white border-gray-300 group-hover:border-gray-500'
+                  }`}
+                    onClick={() => toggleSource(src.id)}>
+                    {sel && (
+                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+                  <span className="text-sm text-gray-700 flex-1">{src.label}</span>
+                  {src.live && (
+                    <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      Live
+                    </span>
+                  )}
+                </label>
+              );
+            })}
           </div>
+        </Section>
 
-        </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -11,39 +11,32 @@ import type { Listing } from '../types';
 
 type Tab = 'listings' | 'sources' | 'areas' | 'applications' | 'settings';
 
-const TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: 'listings',     label: 'Annonser',       icon: '🏠' },
-  { id: 'sources',      label: 'Källor',         icon: '🔍' },
-  { id: 'areas',        label: 'Områden',        icon: '📍' },
-  { id: 'applications', label: 'Mina val',       icon: '📋' },
-  { id: 'settings',     label: 'Notifikationer', icon: '📬' },
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'listings',     label: 'Lediga bostäder' },
+  { id: 'sources',      label: 'Källor & status' },
+  { id: 'areas',        label: 'Stadsdelar' },
+  { id: 'applications', label: 'Mina val' },
+  { id: 'settings',     label: 'Notifikationer' },
 ];
 
 const SORT_OPTIONS = [
-  { id: 'newest',    label: 'Nyast' },
-  { id: 'price_asc', label: 'Billigast' },
-  { id: 'price_desc',label: 'Dyrast' },
-  { id: 'area_desc', label: 'Störst' },
+  { id: 'newest',     label: 'Nyast publicerad' },
+  { id: 'price_asc',  label: 'Lägst hyra' },
+  { id: 'price_desc', label: 'Högst hyra' },
+  { id: 'area_desc',  label: 'Störst bostad' },
 ];
 
-function applyFilters(listings: Listing[], filters: FilterValues): Listing[] {
-  return listings.filter((l) => {
-    if (l.price < filters.minPrice || l.price > filters.maxPrice) return false;
-    if (l.rooms) {
-      if (l.rooms < filters.minRooms || l.rooms > filters.maxRooms) return false;
+function applyFilters(listings: Listing[], f: FilterValues): Listing[] {
+  return listings.filter(l => {
+    if (l.price < f.minPrice || l.price > f.maxPrice) return false;
+    if (l.rooms && (l.rooms < f.minRooms || l.rooms > f.maxRooms)) return false;
+    if (l.area && (l.area < f.minArea || l.area > f.maxArea)) return false;
+    if (f.selectedAreas.length > 0) {
+      if (!f.selectedAreas.some(a => l.address.toLowerCase().includes(a.toLowerCase()))) return false;
     }
-    if (l.area) {
-      if (l.area < filters.minArea || l.area > filters.maxArea) return false;
-    }
-    if (filters.selectedAreas.length > 0) {
-      const match = filters.selectedAreas.some((area) =>
-        l.address.toLowerCase().includes(area.toLowerCase())
-      );
-      if (!match) return false;
-    }
-    if (filters.petFriendly && !l.petFriendly) return false;
-    if (filters.furnished && !l.hasFurnished) return false;
-    if (filters.sources.length > 0 && !filters.sources.includes(l.source)) return false;
+    if (f.petFriendly && !l.petFriendly) return false;
+    if (f.furnished && !l.hasFurnished) return false;
+    if (f.sources.length > 0 && !f.sources.includes(l.source)) return false;
     return true;
   });
 }
@@ -54,15 +47,15 @@ function applySort(listings: Listing[], sort: string): Listing[] {
       case 'price_asc':  return a.price - b.price;
       case 'price_desc': return b.price - a.price;
       case 'area_desc':  return (b.area ?? 0) - (a.area ?? 0);
-      case 'newest':
-      default:
-        return new Date(b.listedAt).getTime() - new Date(a.listedAt).getTime();
+      default:           return new Date(b.listedAt).getTime() - new Date(a.listedAt).getTime();
     }
   });
 }
 
 export function Dashboard() {
   const [activeTab, setActiveTab] = useState<Tab>('listings');
+  const [sort, setSort] = useState('newest');
+  const [showMobileFilter, setShowMobileFilter] = useState(false);
   const [filters, setFilters] = useState<FilterValues>({
     minPrice: 0,
     maxPrice: 20000,
@@ -75,40 +68,75 @@ export function Dashboard() {
     furnished: false,
     sources: ['blocket', 'bostadsportal', 'qasa', 'hyresratter', 'lkf', 'afbostader', 'facebook'],
   });
-  const [sort, setSort] = useState('newest');
-  const [showFilters, setShowFilters] = useState(false);
 
-  const filtered = useMemo(() => applySort(applyFilters(MOCK_LISTINGS, filters), sort), [filters, sort]);
+  const filtered = useMemo(
+    () => applySort(applyFilters(MOCK_LISTINGS, filters), sort),
+    [filters, sort]
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-bold text-gray-900 leading-tight">Hitta boende i Lund för I&amp;F</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full border border-blue-100">
-              {filtered.length} annonser
+    <div className="min-h-screen bg-[#f5f4f0]">
+
+      {/* ── Hero header ─────────────────────────────────────────────── */}
+      <header className="relative overflow-hidden bg-[#1c2b3a]">
+        {/* Background image of Lund */}
+        <div
+          className="absolute inset-0 bg-cover bg-center opacity-30"
+          style={{ backgroundImage: "url('https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1600&q=70')" }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#1c2b3a]/60 to-[#1c2b3a]/90" />
+
+        <div className="relative max-w-7xl mx-auto px-6">
+          {/* Top bar */}
+          <div className="flex items-center justify-between py-5 border-b border-white/10">
+            <div>
+              <h1 className="text-white font-bold text-xl tracking-tight">
+                Hitta boende i Lund
+              </h1>
+              <p className="text-white/50 text-xs mt-0.5">för I&amp;F · Familjedashboard</p>
+            </div>
+            <span className="text-xs text-white/60 bg-white/10 px-3 py-1.5 rounded-full">
+              {filtered.length} {filtered.length === 1 ? 'annons' : 'annonser'}
             </span>
           </div>
-        </div>
 
-        {/* Tabs */}
-        <div className="max-w-6xl mx-auto px-4">
-          <nav className="flex gap-1 -mb-px">
-            {TABS.map((tab) => (
+          {/* Stats row */}
+          <div className="flex items-center gap-8 py-5">
+            <div className="text-center">
+              <p className="text-3xl font-bold text-white">{MOCK_LISTINGS.length}</p>
+              <p className="text-xs text-white/50 mt-0.5">Totalt</p>
+            </div>
+            <div className="w-px h-10 bg-white/10" />
+            <div className="text-center">
+              <p className="text-3xl font-bold text-emerald-400">
+                {MOCK_LISTINGS.filter(l => {
+                  const d = (Date.now() - new Date(l.listedAt).getTime()) / 86_400_000;
+                  return d < 1;
+                }).length}
+              </p>
+              <p className="text-xs text-white/50 mt-0.5">Nya idag</p>
+            </div>
+            <div className="w-px h-10 bg-white/10" />
+            <div className="text-center">
+              <p className="text-3xl font-bold text-white">
+                {Math.round(MOCK_LISTINGS.reduce((s, l) => s + l.price, 0) / MOCK_LISTINGS.length / 100) * 100}
+              </p>
+              <p className="text-xs text-white/50 mt-0.5">Snittshyra kr</p>
+            </div>
+          </div>
+
+          {/* Tab nav */}
+          <nav className="flex gap-0.5 -mb-px">
+            {TABS.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2.5 text-sm font-medium border-b-2 transition whitespace-nowrap ${
+                className={`px-5 py-3 text-sm font-medium rounded-t-lg transition-all ${
                   activeTab === tab.id
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'bg-[#f5f4f0] text-[#1c2b3a]'
+                    : 'text-white/60 hover:text-white hover:bg-white/10'
                 }`}
               >
-                <span className="mr-1.5">{tab.icon}</span>
                 {tab.label}
               </button>
             ))}
@@ -116,32 +144,40 @@ export function Dashboard() {
         </div>
       </header>
 
-      {/* Main content */}
-      <main className="max-w-6xl mx-auto px-4 py-6">
+      {/* ── Main content ─────────────────────────────────────────────── */}
+      <main className="max-w-7xl mx-auto px-6 py-8">
 
+        {/* ── LISTINGS tab ──────────────────────────────────────────── */}
         {activeTab === 'listings' && (
-          <div className="flex flex-col lg:flex-row gap-6">
-            {/* Sidebar (filter) – desktop */}
+          <div className="flex gap-8">
+
+            {/* Sidebar – desktop */}
             <aside className="hidden lg:block w-72 shrink-0">
-              <div className="sticky top-[105px]">
+              <div className="sticky top-6">
                 <FilterPanel onFilterChange={setFilters} />
               </div>
             </aside>
 
-            {/* Main listing area */}
+            {/* Content area */}
             <div className="flex-1 min-w-0">
+
               {/* Mobile filter toggle */}
               <div className="lg:hidden mb-4">
                 <button
-                  onClick={() => setShowFilters(!showFilters)}
-                  className="w-full flex items-center justify-between px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm font-medium text-gray-700"
+                  onClick={() => setShowMobileFilter(!showMobileFilter)}
+                  className="w-full flex items-center justify-between px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm font-medium text-gray-700 shadow-sm"
                 >
-                  <span>Filter & sökning</span>
-                  <svg className={`w-4 h-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <span className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+                    </svg>
+                    Filter &amp; sökning
+                  </span>
+                  <svg className={`w-4 h-4 text-gray-400 transition-transform ${showMobileFilter ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
-                {showFilters && (
+                {showMobileFilter && (
                   <div className="mt-2">
                     <FilterPanel onFilterChange={setFilters} />
                   </div>
@@ -149,112 +185,103 @@ export function Dashboard() {
               </div>
 
               {/* Sort + count */}
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-5">
                 <p className="text-sm text-gray-600">
                   {filtered.length === 0
-                    ? 'Inga annonser matchar dina filter'
-                    : `${filtered.length} ${filtered.length === 1 ? 'annons' : 'annonser'}`}
+                    ? <span className="text-gray-400">Inga annonser matchar filtren</span>
+                    : <><span className="font-semibold text-gray-900">{filtered.length}</span> {filtered.length === 1 ? 'annons' : 'annonser'}</>
+                  }
                 </p>
                 <select
                   value={sort}
-                  onChange={(e) => setSort(e.target.value)}
-                  className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={e => setSort(e.target.value)}
+                  className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 cursor-pointer shadow-sm"
                 >
-                  {SORT_OPTIONS.map((o) => (
+                  {SORT_OPTIONS.map(o => (
                     <option key={o.id} value={o.id}>{o.label}</option>
                   ))}
                 </select>
               </div>
 
-              {/* Listings grid */}
+              {/* Grid */}
               {filtered.length === 0 ? (
-                <div className="text-center py-16 bg-white rounded-xl border border-gray-200">
-                  <p className="text-4xl mb-3">🔍</p>
-                  <p className="text-gray-500 text-lg font-medium">Inga annonser hittades</p>
-                  <p className="text-gray-400 text-sm mt-1">Prova att bredda dina filter</p>
+                <div className="text-center py-20 bg-white rounded-2xl border border-gray-100">
+                  <p className="text-5xl mb-4">🔍</p>
+                  <p className="text-gray-600 font-medium text-lg">Inga annonser hittades</p>
+                  <p className="text-gray-400 text-sm mt-1">Prova att bredda filtren</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {filtered.map((listing) => (
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+                  {filtered.map(listing => (
                     <ListingCard key={listing.id} listing={listing} />
                   ))}
                 </div>
               )}
 
               {/* Demo notice */}
-              <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-700">
-                <strong>Demo-data</strong> – Dessa annonser är exempeldata. Nästa steg är att koppla till riktiga källor (Blocket, Bostadsportal, LKF) via API/scraping för att visa verkliga annonser automatiskt.
+              <div className="mt-8 p-5 bg-[#1c2b3a]/5 border border-[#1c2b3a]/10 rounded-2xl">
+                <p className="text-sm text-gray-700">
+                  <span className="font-semibold">Demo-annonser</span> – Starta backend-servern för riktiga Qasa- och AF Bostäder-annonser i realtid:
+                  <code className="ml-2 text-xs bg-gray-200 px-2 py-0.5 rounded font-mono">npm run dev:server</code>
+                </p>
               </div>
             </div>
           </div>
         )}
 
+        {/* ── SOURCES tab ───────────────────────────────────────────── */}
         {activeTab === 'sources' && (
           <div className="max-w-3xl space-y-10">
-            {/* Integration status */}
             <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-1">Integrationsstatus</h2>
-              <p className="text-gray-500 text-sm mb-5">
-                Vilka källor är kopplade med live-data och vilka visar bara demodata.
-              </p>
-              <IntegrationStatus />
+              <h2 className="text-2xl font-bold text-[#1c2b3a] mb-1">Integrationsstatus</h2>
+              <p className="text-gray-500 text-sm">Vilka källor är live och vilka visar demodata.</p>
             </div>
-
-            {/* Divider */}
+            <IntegrationStatus />
             <hr className="border-gray-200" />
-
-            {/* Sources panel */}
             <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-1">Köer & portaler</h2>
-              <p className="text-gray-500 text-sm mb-5">
-                Var du hittar hyresrätter i Lund – och vilka köer du bör anmäla dig till nu.
-              </p>
-              <SourcesPanel />
+              <h2 className="text-2xl font-bold text-[#1c2b3a] mb-1">Köer &amp; portaler</h2>
+              <p className="text-gray-500 text-sm">Anmäl dig till köer och kolla externa portaler direkt.</p>
             </div>
+            <SourcesPanel />
           </div>
         )}
 
+        {/* ── AREAS tab ─────────────────────────────────────────────── */}
         {activeTab === 'areas' && (
           <div className="max-w-3xl">
-            <div className="mb-6">
-              <h2 className="text-xl font-bold text-gray-900">Lunds stadsdelar</h2>
-              <p className="text-gray-600 text-sm mt-1">
-                Översikt över populära områden – pris, pendling och karaktär.
-              </p>
+            <div className="mb-8">
+              <h2 className="text-2xl font-bold text-[#1c2b3a]">Lunds stadsdelar</h2>
+              <p className="text-gray-500 text-sm mt-1">Hitta rätt område – pris, pendling och karaktär.</p>
             </div>
             <AreasGuide />
           </div>
         )}
 
+        {/* ── APPLICATIONS tab ──────────────────────────────────────── */}
         {activeTab === 'applications' && (
           <div className="max-w-2xl">
-            <div className="mb-6">
-              <h2 className="text-xl font-bold text-gray-900">Mina val</h2>
-              <p className="text-gray-600 text-sm mt-1">
-                Annonser du markerat som intressant, ansökt om eller fått svar på.
-              </p>
+            <div className="mb-8">
+              <h2 className="text-2xl font-bold text-[#1c2b3a]">Mina val</h2>
+              <p className="text-gray-500 text-sm mt-1">Bostäder du markerat och trackrar.</p>
             </div>
-            <div className="text-center py-16 bg-white rounded-xl border border-gray-200">
-              <p className="text-4xl mb-3">📋</p>
-              <p className="text-gray-500">Inga markerade annonser ännu.</p>
-              <p className="text-gray-400 text-sm mt-1">
-                Gå till Annonser och markera dem du är intresserad av.
-              </p>
+            <div className="text-center py-20 bg-white rounded-2xl border border-gray-100">
+              <p className="text-5xl mb-4">📋</p>
+              <p className="text-gray-600 font-medium">Inga markerade annonser ännu</p>
+              <p className="text-gray-400 text-sm mt-1">Gå till Lediga bostäder och markera dem du gillar</p>
             </div>
           </div>
         )}
 
+        {/* ── SETTINGS tab ──────────────────────────────────────────── */}
         {activeTab === 'settings' && (
-          <div className="max-w-lg">
-            <div className="mb-6">
-              <h2 className="text-xl font-bold text-gray-900">Notifikationer</h2>
-              <p className="text-gray-600 text-sm mt-1">
-                Prenumerera på daglig sammanfattning eller direktnotis när nya annonser dyker upp.
-              </p>
+          <div className="max-w-md">
+            <div className="mb-8">
+              <h2 className="text-2xl font-bold text-[#1c2b3a]">Notifikationer</h2>
+              <p className="text-gray-500 text-sm mt-1">Prenumerera på daglig sammanfattning eller direktnotis.</p>
             </div>
             <EmailSubscribe />
-            <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-700">
-              <strong>OBS:</strong> E-post kräver att backend-servern är igång (Railway). Se <code>SETUP.md</code> för deployment-instruktioner. Konfigurera <code>SENDGRID_API_KEY</code> eller SMTP i <code>.env</code>.
+            <div className="mt-4 p-4 bg-amber-50 border border-amber-100 rounded-xl text-sm text-amber-700">
+              Kräver backend-servern + e-postkonfiguration i <code className="bg-amber-100 px-1 rounded">.env.local</code>.
             </div>
           </div>
         )}
