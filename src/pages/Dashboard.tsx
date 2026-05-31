@@ -5,6 +5,7 @@ import { ListingCard } from '../components/Listings/ListingCard';
 import { SourcesPanel } from '../components/SourcesPanel';
 import { AreasGuide } from '../components/AreasGuide';
 import { EmailSubscribe } from '../components/EmailSubscribe';
+import { IntegrationStatus } from '../components/IntegrationStatus';
 import { MOCK_LISTINGS } from '../data/mockListings';
 import type { Listing } from '../types';
 
@@ -189,14 +190,27 @@ export function Dashboard() {
         )}
 
         {activeTab === 'sources' && (
-          <div className="max-w-2xl">
-            <div className="mb-6">
-              <h2 className="text-xl font-bold text-gray-900">Källor & bostadsköer</h2>
-              <p className="text-gray-600 text-sm mt-1">
-                Var du hittar hyresrätter i Lund, och viktigast – köer du bör anmäla dig till omedelbart.
+          <div className="max-w-3xl space-y-10">
+            {/* Integration status */}
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 mb-1">Integrationsstatus</h2>
+              <p className="text-gray-500 text-sm mb-5">
+                Vilka källor är kopplade med live-data och vilka visar bara demodata.
               </p>
+              <IntegrationStatus />
             </div>
-            <SourcesPanel />
+
+            {/* Divider */}
+            <hr className="border-gray-200" />
+
+            {/* Sources panel */}
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 mb-1">Köer & portaler</h2>
+              <p className="text-gray-500 text-sm mb-5">
+                Var du hittar hyresrätter i Lund – och vilka köer du bör anmäla dig till nu.
+              </p>
+              <SourcesPanel />
+            </div>
           </div>
         )}
 

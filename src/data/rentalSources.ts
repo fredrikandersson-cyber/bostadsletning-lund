@@ -1,14 +1,22 @@
+export type IntegrationStatus =
+  | 'live'       // Fully connected, live data
+  | 'mock'       // Demo/placeholder data only
+  | 'planned'    // On roadmap, not yet built
+  | 'manual';    // Manual link-out, no auto-import
+
 export interface RentalSource {
   id: string;
   name: string;
   url: string;
   type: 'portal' | 'queue' | 'social' | 'direct';
   description: string;
-  searchUrl: string; // Pre-filtered search URL for Lund rentals
+  searchUrl: string;
   hasApi: boolean;
   apiNotes?: string;
   updateFrequency: string;
   tips: string[];
+  integration: IntegrationStatus;
+  integrationNote?: string; // What's needed to go live
 }
 
 export const RENTAL_SOURCES: RentalSource[] = [
@@ -27,6 +35,8 @@ export const RENTAL_SOURCES: RentalSource[] = [
       'Agera snabbt – populära annonser försvinner på timmar',
       'Privata värdar kontaktas direkt via annons',
     ],
+    integration: 'mock',
+    integrationNote: 'Kräver scraping av blocket.se/bostad – ingen officiell API. Tekniskt möjligt men kräver underhåll.',
   },
   {
     id: 'bostadsportal',
@@ -41,6 +51,8 @@ export const RENTAL_SOURCES: RentalSource[] = [
       'Aktivera "sökvakt" för automatiska notiser',
       'Bra utbud från medelstora privata fastighetsbolag',
     ],
+    integration: 'mock',
+    integrationNote: 'Ingen publik API. Kräver scraping – möjligt att implementera med Playwright/Puppeteer.',
   },
   {
     id: 'qasa',
@@ -55,6 +67,8 @@ export const RENTAL_SOURCES: RentalSource[] = [
       'Säkra betalningar via Qasa-systemet',
       'Profiler för hyresvärdar skapar trygghet',
     ],
+    integration: 'mock',
+    integrationNote: 'Ingen publik API. Scraping möjlig men kräver login-session.',
   },
   {
     id: 'hyresratter',
@@ -66,6 +80,8 @@ export const RENTAL_SOURCES: RentalSource[] = [
     hasApi: false,
     updateFrequency: 'Dagligen',
     tips: ['Bra för att hitta annonser från mindre fastighetsbolag'],
+    integration: 'mock',
+    integrationNote: 'Ingen publik API. RSS-feed möjlig via rss.app – enklaste vägen till live-data.',
   },
   {
     id: 'lkf',
@@ -82,6 +98,8 @@ export const RENTAL_SOURCES: RentalSource[] = [
       'Lediga lägenheter läggs ut torsdagar',
       'Gratis att stå i kön',
     ],
+    integration: 'mock',
+    integrationNote: 'Ingen API. Scraping av lkf.se/lediga-lagenheter möjlig – enkel HTML-struktur.',
   },
   {
     id: 'afbostader',
@@ -98,6 +116,8 @@ export const RENTAL_SOURCES: RentalSource[] = [
       'Anmäl till kön INNAN antagningsbesked i juli',
       'Förnya köplatsen varje år',
     ],
+    integration: 'mock',
+    integrationNote: 'Ingen API. Scraping av afbostader.se/lediga-bostader möjlig.',
   },
   {
     id: 'lundafastigheter',
@@ -109,6 +129,8 @@ export const RENTAL_SOURCES: RentalSource[] = [
     hasApi: false,
     updateFrequency: 'Vid behov',
     tips: ['Kontakta direkt för att anmäla intresse'],
+    integration: 'manual',
+    integrationNote: 'Länk direkt till webbplatsen – inga annonser importeras automatiskt.',
   },
   {
     id: 'facebook_lund',
@@ -126,6 +148,8 @@ export const RENTAL_SOURCES: RentalSource[] = [
       'Agera snabbt, svara direkt i kommentar + PM',
       'Var beredd med personlig presentation om dig/er',
     ],
+    integration: 'mock',
+    integrationNote: 'Facebook tillåter inte scraping/API för grupper. Annonser måste läggas in manuellt eller via tredjepartsverktyg.',
   },
   {
     id: 'andrahand',
@@ -141,6 +165,8 @@ export const RENTAL_SOURCES: RentalSource[] = [
       'Kortare kontrakt vanliga (3–12 månader)',
       'Kolla att hyresvärden godkänt uthyrningen',
     ],
+    integration: 'planned',
+    integrationNote: 'Scraping planerad – RSS-feed finns via rss.app.',
   },
 ];
 
