@@ -9,6 +9,8 @@ import { scrapeBlocket } from './api/scrapers/blocket.js';
 import { scrapeLKF } from './api/scrapers/lkf.js';
 import { scrapeQasa } from './api/scrapers/qasa.js';
 import { scrapeAFBostader } from './api/scrapers/afbostader.js';
+import { scrapeBostadsportal } from './api/scrapers/bostadsportal.js';
+import { scrapeHyresratter } from './api/scrapers/hyresratter.js';
 
 dotenv.config();
 
@@ -411,6 +413,32 @@ async function runScrapers() {
           data: { source: 'qasa', status: 'error', listingsFound: 0, newListings: 0, errorMessage: err.message, nextPollAt: new Date(Date.now() + 15 * 60_000) },
         });
         throw err;
+      }),
+      // Bostadsportal - new source
+      scrapeBostadsportal(browser as any).then(async (items) => {
+        const n = await upsertListings(items);
+        await prisma.apiPoll.create({
+          data: { source: 'bostadsportal', status: 'success', listingsFound: items.length, newListings: n, nextPollAt: new Date(Date.now() + 60 * 60_000) },
+        });
+        console.log(`[bostadsportal] ${items.length} fetched, ${n} new`);
+      }).catch(async (err) => {
+        await prisma.apiPoll.create({
+          data: { source: 'bostadsportal', status: 'error', listingsFound: 0, newListings: 0, errorMessage: err.message, nextPollAt: new Date(Date.now() + 60 * 60_000) },
+        });
+        console.warn('[bostadsportal] Error:', err.message);
+      }),
+      // Hyresrätter - new source
+      scrapeHyresratter(browser as any).then(async (items) => {
+        const n = await upsertListings(items);
+        await prisma.apiPoll.create({
+          data: { source: 'hyresratter', status: 'success', listingsFound: items.length, newListings: n, nextPollAt: new Date(Date.now() + 60 * 60_000) },
+        });
+        console.log(`[hyresratter] ${items.length} fetched, ${n} new`);
+      }).catch(async (err) => {
+        await prisma.apiPoll.create({
+          data: { source: 'hyresratter', status: 'error', listingsFound: 0, newListings: 0, errorMessage: err.message, nextPollAt: new Date(Date.now() + 60 * 60_000) },
+        });
+        console.warn('[hyresratter] Error:', err.message);
       }),
     ]);
 

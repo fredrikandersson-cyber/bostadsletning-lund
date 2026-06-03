@@ -20,7 +20,6 @@ const HOME_SEARCH_QUERY = `
           petsAllowed
           homeType
           publishedAt
-          location { city streetAddress }
           uploads { url }
         }
       }
@@ -40,7 +39,6 @@ interface QasaNode {
   petsAllowed?: boolean;
   homeType?: string;
   publishedAt?: string;
-  location?: { city?: string; streetAddress?: string };
   uploads?: { url: string }[];
 }
 
@@ -82,19 +80,17 @@ export async function scrapeQasa(): Promise<ScrapedListing[]> {
   console.log(`[qasa] ${nodes.length} Lund listings (filtered by se/lund area)`);
 
   return nodes.map((node): ScrapedListing => {
-    const address = [node.location?.streetAddress, node.location?.city]
-      .filter(Boolean)
-      .join(', ') || 'Lund';
+    const address = node.title || `Bostad i Lund (${node.id})`;
 
     return {
       externalId: `qasa-${node.id}`,
       source: 'qasa',
-      title: node.title || `Qasa – ${address}`,
+      title: node.title || `Qasa bostad`,
       description: node.description,
       price: node.rent || 0,
       rooms: node.roomCount,
       area: node.squareMeters,
-      address,
+      address: `${address}, Lund`,
       imageUrl: node.uploads?.[0]?.url,
       url: `https://qasa.com/se/sv/home/${node.id}`,
       landlordType: 'private',

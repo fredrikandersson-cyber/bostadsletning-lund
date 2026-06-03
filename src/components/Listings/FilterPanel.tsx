@@ -30,10 +30,10 @@ const DEFAULT: FilterValues = {
 const SOURCE_OPTIONS = [
   { id: 'qasa',          label: 'Qasa',          live: true },
   { id: 'afbostader',    label: 'AF Bostäder',    live: true },
-  { id: 'lkf',           label: 'LKF',            live: false },
+  { id: 'lkf',           label: 'LKF',            live: true },
+  { id: 'bostadsportal', label: 'Bostadsportal',  live: true },
+  { id: 'hyresratter',   label: 'Hyresrätter',    live: true },
   { id: 'blocket',       label: 'Blocket',        live: false },
-  { id: 'bostadsportal', label: 'Bostadsportal',  live: false },
-  { id: 'hyresratter',   label: 'Hyresrätter',    live: false },
   { id: 'facebook',      label: 'Facebook',       live: false },
 ];
 

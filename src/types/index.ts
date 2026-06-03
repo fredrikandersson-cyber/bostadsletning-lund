@@ -27,7 +27,7 @@ export interface AuthContext {
 }
 
 // Listings
-export type ListingSource = 'hemnet' | 'blocket' | 'booli';
+export type ListingSource = 'hemnet' | 'blocket' | 'booli' | 'qasa' | 'afbostader' | 'lkf' | 'bostadsportal' | 'hyresratter' | 'facebook';
 export type PropertyType = 'apartment' | 'house';
 export type LandlordType = 'private' | 'company';
 export type LeaseType = 'long_term' | 'short_term';

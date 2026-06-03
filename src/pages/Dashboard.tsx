@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { FilterPanel } from '../components/Listings/FilterPanel';
 import type { FilterValues } from '../components/Listings/FilterPanel';
 import { ListingCard } from '../components/Listings/ListingCard';
@@ -6,7 +6,6 @@ import { SourcesPanel } from '../components/SourcesPanel';
 import { AreasGuide } from '../components/AreasGuide';
 import { EmailSubscribe } from '../components/EmailSubscribe';
 import { IntegrationStatus } from '../components/IntegrationStatus';
-import { MOCK_LISTINGS } from '../data/mockListings';
 import type { Listing } from '../types';
 
 type Tab = 'listings' | 'sources' | 'areas' | 'applications' | 'settings';
@@ -56,6 +55,10 @@ export function Dashboard() {
   const [activeTab, setActiveTab] = useState<Tab>('listings');
   const [sort, setSort] = useState('newest');
   const [showMobileFilter, setShowMobileFilter] = useState(false);
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [filters, setFilters] = useState<FilterValues>({
     minPrice: 0,
     maxPrice: 20000,
@@ -66,12 +69,50 @@ export function Dashboard() {
     selectedAreas: [],
     petFriendly: false,
     furnished: false,
-    sources: ['blocket', 'bostadsportal', 'qasa', 'hyresratter', 'lkf', 'afbostader', 'facebook'],
+    sources: ['blocket', 'bostadsportal', 'qasa', 'hyresratter', 'lkf', 'afbostader'],
   });
 
+  // Fetch listings from API
+  useEffect(() => {
+    const fetchListings = async () => {
+      try {
+        setLoading(true);
+        // Get token from localStorage (set during login)
+        const token = localStorage.getItem('token');
+        if (!token) {
+          setError('Ej inloggad');
+          setLoading(false);
+          return;
+        }
+
+        const res = await fetch('http://localhost:3000/api/routes/listings', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (!res.ok) {
+          throw new Error(`API error: ${res.status}`);
+        }
+
+        const data = await res.json();
+        setListings(data.listings || []);
+        setError(null);
+      } catch (err) {
+        console.error('Failed to fetch listings:', err);
+        setError(err instanceof Error ? err.message : 'Kunde inte hämta listningar');
+        setListings([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchListings();
+  }, []);
+
   const filtered = useMemo(
-    () => applySort(applyFilters(MOCK_LISTINGS, filters), sort),
-    [filters, sort]
+    () => applySort(applyFilters(listings, filters), sort),
+    [listings, filters, sort]
   );
 
   return (
@@ -79,10 +120,10 @@ export function Dashboard() {
 
       {/* ── Hero header ─────────────────────────────────────────────── */}
       <header className="relative overflow-hidden bg-[#1c2b3a]">
-        {/* Background image of Lund */}
+        {/* Background image of Lund University */}
         <div
-          className="absolute inset-0 bg-cover bg-center opacity-30"
-          style={{ backgroundImage: "url('https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1600&q=70')" }}
+          className="absolute inset-0 bg-cover bg-center opacity-25"
+          style={{ backgroundImage: "url('https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=1600&q=70')" }}
         />
         <div className="absolute inset-0 bg-gradient-to-b from-[#1c2b3a]/60 to-[#1c2b3a]/90" />
 
@@ -103,13 +144,13 @@ export function Dashboard() {
           {/* Stats row */}
           <div className="flex items-center gap-8 py-5">
             <div className="text-center">
-              <p className="text-3xl font-bold text-white">{MOCK_LISTINGS.length}</p>
+              <p className="text-3xl font-bold text-white">{listings.length}</p>
               <p className="text-xs text-white/50 mt-0.5">Totalt</p>
             </div>
             <div className="w-px h-10 bg-white/10" />
             <div className="text-center">
               <p className="text-3xl font-bold text-emerald-400">
-                {MOCK_LISTINGS.filter(l => {
+                {listings.filter(l => {
                   const d = (Date.now() - new Date(l.listedAt).getTime()) / 86_400_000;
                   return d < 1;
                 }).length}
@@ -119,7 +160,7 @@ export function Dashboard() {
             <div className="w-px h-10 bg-white/10" />
             <div className="text-center">
               <p className="text-3xl font-bold text-white">
-                {Math.round(MOCK_LISTINGS.reduce((s, l) => s + l.price, 0) / MOCK_LISTINGS.length / 100) * 100}
+                {listings.length > 0 ? Math.round(listings.reduce((s, l) => s + l.price, 0) / listings.length / 100) * 100 : '-'}
               </p>
               <p className="text-xs text-white/50 mt-0.5">Snittshyra kr</p>
             </div>
@@ -203,28 +244,45 @@ export function Dashboard() {
                 </select>
               </div>
 
-              {/* Grid */}
-              {filtered.length === 0 ? (
+              {/* Loading state */}
+              {loading && (
                 <div className="text-center py-20 bg-white rounded-2xl border border-gray-100">
-                  <p className="text-5xl mb-4">🔍</p>
-                  <p className="text-gray-600 font-medium text-lg">Inga annonser hittades</p>
-                  <p className="text-gray-400 text-sm mt-1">Prova att bredda filtren</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-                  {filtered.map(listing => (
-                    <ListingCard key={listing.id} listing={listing} />
-                  ))}
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                  <p className="text-gray-600 font-medium text-lg mt-4">Hämtar annonser...</p>
                 </div>
               )}
 
-              {/* Demo notice */}
-              <div className="mt-8 p-5 bg-[#1c2b3a]/5 border border-[#1c2b3a]/10 rounded-2xl">
-                <p className="text-sm text-gray-700">
-                  <span className="font-semibold">Demo-annonser</span> – Starta backend-servern för riktiga Qasa- och AF Bostäder-annonser i realtid:
-                  <code className="ml-2 text-xs bg-gray-200 px-2 py-0.5 rounded font-mono">npm run dev:server</code>
-                </p>
-              </div>
+              {/* Error state */}
+              {error && !loading && (
+                <div className="text-center py-20 bg-white rounded-2xl border border-red-100">
+                  <p className="text-5xl mb-4">⚠️</p>
+                  <p className="text-gray-600 font-medium text-lg">Kunde inte hämta annonser</p>
+                  <p className="text-gray-400 text-sm mt-1">{error}</p>
+                </div>
+              )}
+
+              {/* Grid */}
+              {!loading && !error && (
+                <>
+                  {filtered.length === 0 ? (
+                    <div className="text-center py-20 bg-white rounded-2xl border border-gray-100">
+                      <p className="text-5xl mb-4">🔍</p>
+                      <p className="text-gray-600 font-medium text-lg">
+                        {listings.length === 0 ? 'Inga annonser ännu' : 'Inga annonser matchar filtren'}
+                      </p>
+                      <p className="text-gray-400 text-sm mt-1">
+                        {listings.length === 0 ? 'Scraperna körs var 15:e minut' : 'Prova att bredda filtren'}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+                      {filtered.map(listing => (
+                        <ListingCard key={listing.id} listing={listing} />
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
         )}

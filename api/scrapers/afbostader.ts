@@ -1,3 +1,4 @@
+import https from 'https';
 import type { ScrapedListing } from './blocket.js';
 
 const API_URL = 'https://afbostader.se/DiremoApi/redimo/rest/vacantproducts?lang=sv_SE&type=1';
@@ -28,7 +29,6 @@ interface AFProduct {
 export async function scrapeAFBostader(): Promise<ScrapedListing[]> {
   // AF Bostäder has a self-signed/intermediate cert issue – use https module with rejectUnauthorized: false
   const data = await new Promise<any>((resolve, reject) => {
-    const https = require('https');
     https.get(API_URL, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',

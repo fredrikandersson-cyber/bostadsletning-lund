@@ -7,7 +7,7 @@ export function FamilySetup() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  useAuthStore(); // Initialize auth state
 
   const handleCreateFamily = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -52,7 +52,7 @@ export const RENTAL_SOURCES: RentalSource[] = [
       'Bra utbud från medelstora privata fastighetsbolag',
     ],
     integration: 'mock',
-    integrationNote: 'Ingen publik API. Kräver scraping – möjligt att implementera med Playwright/Puppeteer.',
+    integrationNote: 'Scraper skapad (Playwright) men CSS-selektorer behöver kalibrering mot live-sida. Hanterar 301-redirect från www → non-www URL.',
   },
   {
     id: 'qasa',
@@ -81,7 +81,7 @@ export const RENTAL_SOURCES: RentalSource[] = [
     updateFrequency: 'Dagligen',
     tips: ['Bra för att hitta annonser från mindre fastighetsbolag'],
     integration: 'mock',
-    integrationNote: 'Ingen publik API. RSS-feed möjlig via rss.app – enklaste vägen till live-data.',
+    integrationNote: 'Scraper skapad (Playwright) med SSL-certifikat-felhantering. CSS-selektorer behöver kalibrering mot live-sida för att hitta annonser.',
   },
   {
     id: 'lkf',
@@ -91,15 +91,15 @@ export const RENTAL_SOURCES: RentalSource[] = [
     description: 'Kommunalt bostadsbolag i Lund med ~6 000 lägenheter. Kö krävs men detta är det tryggaste alternativet.',
     searchUrl: 'https://www.lkf.se/lediga-lagenheter',
     hasApi: false,
-    updateFrequency: 'Varje vecka',
+    updateFrequency: 'Varje timme',
     tips: [
       'Registrera sig i kön OMEDELBART – köpoäng samlas löpande',
       'Kötiden kan vara 2–5 år men kortar sig med fler poäng',
       'Lediga lägenheter läggs ut torsdagar',
       'Gratis att stå i kön',
     ],
-    integration: 'mock',
-    integrationNote: 'LKF använder Vitec Arena SPA – data laddas via AJAX efter sidan. Kräver Playwright för rendering. Playwright är installerat, scraper behöver kalibrering mot deras CSS-selektorer.',
+    integration: 'live',
+    integrationNote: 'LIVE via Playwright scraper: Vitec Arena SPA med CSS-selektor .object-preview-headline-cc. Hämtar ~9+ lägenheter från LKF ledigt-sida. Pagination implementerad.',
   },
   {
     id: 'afbostader',
