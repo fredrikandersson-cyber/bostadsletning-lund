@@ -12,6 +12,9 @@ RUN npm ci
 # Copy all source
 COPY . .
 
+# Generate Prisma client
+RUN npx prisma generate
+
 # Build everything (frontend + backend TypeScript)
 RUN npm run build
 
@@ -26,7 +29,9 @@ RUN npm ci --omit=dev
 # Copy built files
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
 EXPOSE 3000
 
-CMD ["node", "dist/server.js"]
+# Run migrations then start server
+CMD npx prisma migrate deploy && node dist/server.js
