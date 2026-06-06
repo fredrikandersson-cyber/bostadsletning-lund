@@ -32,5 +32,5 @@ COPY --from=builder /app/dist ./dist
 # Expose port
 EXPOSE 3000
 
-# Run server
-CMD ["node", "dist/server.js"]
+# Run server with tsx to execute TypeScript directly
+CMD ["npx", "tsx", "server.ts"]
