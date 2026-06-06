@@ -1,4 +1,4 @@
-# Builder stage - build TypeScript
+# Builder stage
 FROM node:20-alpine AS builder
 
 WORKDIR /app
@@ -6,36 +6,28 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install all dependencies (including devDependencies for build)
+# Install all dependencies
 RUN npm ci
 
-# Copy source code
+# Copy all source
 COPY . .
 
-# Build TypeScript
+# Build everything (frontend + backend TypeScript)
 RUN npm run build
+RUN npx tsc server.ts --outDir dist --module esnext --target es2020
 
-# Production stage - only runtime files
+# Production stage
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy package files
 COPY package*.json ./
+RUN npm ci --omit=dev
 
-# Install only production dependencies
-RUN npm ci --only=production
-
-# Copy built files from builder
+# Copy built files
 COPY --from=builder /app/dist ./dist
-
-# Copy source files needed for tsx
-COPY --from=builder /app/*.ts ./
 COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/tsconfig.json ./
 
-# Expose port
 EXPOSE 3000
 
-# Run server with tsx to execute TypeScript directly
-CMD ["npx", "tsx", "server.ts"]
+CMD ["node", "dist/server.js"]
