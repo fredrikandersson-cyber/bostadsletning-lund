@@ -200,7 +200,7 @@ app.patch('/api/routes/applications/:id', authMiddleware, async (req: AuthReques
     const { status, notes } = req.body;
 
     const application = await prisma.application.update({
-      where: { id },
+      where: { id: id as string },
       data: { status, notes },
       include: { listing: true },
     });
@@ -214,7 +214,7 @@ app.patch('/api/routes/applications/:id', authMiddleware, async (req: AuthReques
 app.delete('/api/routes/applications/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    await prisma.application.delete({ where: { id } });
+    await prisma.application.delete({ where: { id: id as string } });
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete application' });
