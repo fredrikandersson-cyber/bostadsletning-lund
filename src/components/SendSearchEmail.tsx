@@ -7,11 +7,21 @@ interface Listing {
   price: number;
   rooms?: number;
   area?: number;
+  pricePerSqm?: number;
   furnished?: boolean;
   petFriendly?: boolean;
   imageUrl?: string;
   url: string;
   source: string;
+  priority?: number;
+  reason?: string;
+  highlights?: string[];
+}
+
+interface AnalysisResult {
+  listings: Listing[];
+  summary: string;
+  topRecommendation?: string;
 }
 
 interface Props {
@@ -40,7 +50,36 @@ async function fetchRealListings(filters: FilterValues): Promise<Listing[]> {
   return data.listings || [];
 }
 
-function buildEmailBody(filters: FilterValues, listings: Listing[]): string {
+async function analyzeListingsWithAI(listings: Listing[], filters: FilterValues): Promise<AnalysisResult> {
+  try {
+    const res = await fetch('/api/analyze-listings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ listings, filters }),
+    });
+    if (!res.ok) throw new Error(`Analysis API error ${res.status}`);
+    const data = await res.json();
+    return {
+      listings: data.listings || listings,
+      summary: data.summary || '',
+      topRecommendation: data.topRecommendation,
+    };
+  } catch (err) {
+    console.warn('AI analysis failed, using basic priority:', err);
+    // Fallback: return listings with basic priority
+    return {
+      listings: listings.map((l, i) => ({
+        ...l,
+        priority: i + 1,
+        reason: 'Sorterad efter nyaste först',
+        highlights: [],
+      })),
+      summary: `Hittade ${listings.length} bostäder (AI-analys ej tillgänglig)`,
+    };
+  }
+}
+
+function buildEmailBody(filters: FilterValues, listings: Listing[], aiSummary?: string, topRecommendation?: string): string {
   const { minPrice, maxPrice, minRooms, maxRooms, petFriendly, furnished, selectedAreas } = filters;
 
   const criteria = [
@@ -51,7 +90,7 @@ function buildEmailBody(filters: FilterValues, listings: Listing[]): string {
     furnished ? '🛋️ Möblerad' : null,
   ].filter(Boolean).join('\n');
 
-  const listingRows = listings.slice(0, 20).map((l, i) => {
+  const listingRows = listings.slice(0, 20).map((l) => {
     const rooms = l.rooms ? `${l.rooms} rum` : '';
     const area = l.area ? `${l.area} m²` : '';
     const size = [rooms, area].filter(Boolean).join(', ');
@@ -60,19 +99,28 @@ function buildEmailBody(filters: FilterValues, listings: Listing[]): string {
       l.petFriendly ? '🐾 Husdjur' : null,
     ].filter(Boolean).join(' ');
 
-    return `${i + 1}. ${l.title}
-   💰 ${l.price.toLocaleString('sv-SE')} kr/mån${size ? ` · ${size}` : ''}${tags ? ` · ${tags}` : ''}
+    const priorityBadge = l.priority ? `[#${l.priority}]` : '';
+    const reasonText = l.reason ? `\n   ℹ️ ${l.reason}` : '';
+
+    return `${priorityBadge} ${l.title}
+   💰 ${l.price.toLocaleString('sv-SE')} kr/mån${size ? ` · ${size}` : ''}${tags ? ` · ${tags}` : ''}${reasonText}
    👉 ${l.url}`;
   }).join('\n\n');
 
+  const aiSection = aiSummary ? `
+AI-ANALYS
+${aiSummary}
+${topRecommendation ? `\n🌟 TOPPREKOMMENDATION:\n${topRecommendation}\n` : ''}
+` : '';
+
   return `Hej!
 
-Jag har hittat ${listings.length} bostäder i Lund som matchar dina krav. Här är de ${Math.min(listings.length, 20)} senaste:
+Jag har hittat ${listings.length} bostäder i Lund som matchar dina krav. Här är de ${Math.min(listings.length, 20)} bästa enligt AI-prioritering:
 
 DINA SÖKKRITERIER
 ${criteria}
-
-MATCHANDE BOSTÄDER
+${aiSection}
+MATCHANDE BOSTÄDER (PRIORITERADE)
 ${listingRows}
 
 ${listings.length > 20 ? `...och ${listings.length - 20} till. Sök själv på:\nhttps://qasa.com/se/sv/search?area=se%2Flund\n` : ''}
@@ -96,14 +144,27 @@ export function SendSearchEmail({ filters }: Props) {
   const [listings, setListings] = useState<Listing[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [aiSummary, setAiSummary] = useState<string>('');
+  const [topRecommendation, setTopRecommendation] = useState<string>('');
 
   const handleOpen = async () => {
     setShowModal(true);
     setLoading(true);
     setError(null);
+    setAiSummary('');
+    setTopRecommendation('');
     try {
+      // Fetch real listings
       const results = await fetchRealListings(filters);
       setListings(results);
+
+      if (results.length > 0) {
+        // Analyze with AI
+        const analysis = await analyzeListingsWithAI(results, filters);
+        setListings(analysis.listings);
+        setAiSummary(analysis.summary);
+        setTopRecommendation(analysis.topRecommendation || '');
+      }
     } catch (err) {
       setError('Kunde inte hämta listningar just nu');
       setListings([]);
@@ -112,7 +173,7 @@ export function SendSearchEmail({ filters }: Props) {
     }
   };
 
-  const emailBody = buildEmailBody(filters, listings);
+  const emailBody = buildEmailBody(filters, listings, aiSummary, topRecommendation);
   const subject = `${listings.length} bostäder i Lund matchar dina krav`;
 
   const handleSendEmail = () => {
@@ -178,9 +239,12 @@ export function SendSearchEmail({ filters }: Props) {
             {/* Listings preview */}
             <div className="px-6 py-4 border-b border-gray-100">
               {loading && (
-                <div className="flex items-center gap-3 py-4">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-900"></div>
-                  <p className="text-sm text-gray-500">Hämtar matchande bostäder från Qasa...</p>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 py-4">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-900"></div>
+                    <p className="text-sm text-gray-500">Hämtar matchande bostäder från Qasa...</p>
+                  </div>
+                  <p className="text-xs text-gray-400 px-2">Analyserar med AI...</p>
                 </div>
               )}
 
@@ -190,22 +254,46 @@ export function SendSearchEmail({ filters }: Props) {
 
               {!loading && !error && listings.length > 0 && (
                 <>
+                  {aiSummary && (
+                    <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                      <p className="text-xs font-semibold text-blue-900 mb-1">🤖 AI-ANALYS</p>
+                      <p className="text-xs text-blue-800">{aiSummary}</p>
+                    </div>
+                  )}
+
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
-                    {listings.length} matchande bostäder hittades
+                    {listings.length} matchande bostäder (sorterade efter relevans)
                   </p>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                  <div className="space-y-2 max-h-56 overflow-y-auto">
                     {listings.slice(0, 10).map(listing => (
-                      <div key={listing.id} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
+                      <div key={listing.id} className="flex items-start gap-3 p-2 bg-gray-50 rounded-lg">
                         {listing.imageUrl && (
-                          <img src={listing.imageUrl} alt="" className="w-10 h-10 rounded object-cover shrink-0" />
+                          <img src={listing.imageUrl} alt="" className="w-10 h-10 rounded object-cover shrink-0 flex-none" />
                         )}
-                        <div className="min-w-0">
-                          <p className="text-xs font-medium text-gray-900 truncate">{listing.title}</p>
-                          <p className="text-xs text-gray-500">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start gap-2 mb-0.5">
+                            {listing.priority && (
+                              <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
+                                listing.priority === 1 ? 'bg-emerald-100 text-emerald-700' :
+                                listing.priority === 2 ? 'bg-blue-100 text-blue-700' :
+                                'bg-gray-100 text-gray-600'
+                              }`}>
+                                #{listing.priority}
+                              </span>
+                            )}
+                            <p className="text-xs font-medium text-gray-900 truncate">{listing.title}</p>
+                          </div>
+                          <p className="text-xs text-gray-500 mb-1">
                             {listing.price.toLocaleString('sv-SE')} kr/mån
                             {listing.rooms ? ` · ${listing.rooms} rum` : ''}
                             {listing.area ? ` · ${listing.area} m²` : ''}
                           </p>
+                          {listing.highlights && listing.highlights.length > 0 && (
+                            <p className="text-xs text-gray-600">{listing.highlights.join(' ')}</p>
+                          )}
+                          {listing.reason && (
+                            <p className="text-xs text-gray-500 italic">ℹ️ {listing.reason}</p>
+                          )}
                         </div>
                       </div>
                     ))}
