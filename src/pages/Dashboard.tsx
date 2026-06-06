@@ -6,6 +6,7 @@ import { SourcesPanel } from '../components/SourcesPanel';
 import { AreasGuide } from '../components/AreasGuide';
 import { EmailSubscribe } from '../components/EmailSubscribe';
 import { IntegrationStatus } from '../components/IntegrationStatus';
+import { SendSearchEmail } from '../components/SendSearchEmail';
 import type { Listing } from '../types';
 
 type Tab = 'listings' | 'sources' | 'areas' | 'applications' | 'settings';
@@ -194,8 +195,9 @@ export function Dashboard() {
 
             {/* Sidebar – desktop */}
             <aside className="hidden lg:block w-72 shrink-0">
-              <div className="sticky top-6">
+              <div className="sticky top-6 space-y-4">
                 <FilterPanel onFilterChange={setFilters} />
+                <SendSearchEmail filters={filters} />
               </div>
             </aside>
 
