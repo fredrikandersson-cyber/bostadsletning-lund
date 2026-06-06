@@ -29,6 +29,11 @@ RUN npm ci --only=production
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
 
+# Copy source files needed for tsx
+COPY --from=builder /app/*.ts ./
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/tsconfig.json ./
+
 # Expose port
 EXPOSE 3000
 
