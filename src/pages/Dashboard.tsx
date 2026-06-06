@@ -67,8 +67,11 @@ export function Dashboard() {
     maxRooms: 5,
     minArea: 0,
     maxArea: 150,
+    maxPricePerSqm: 0,
     selectedAreas: [],
     petFriendly: false,
+    leaseType: 'all',
+    availableFrom: '',
     furnished: false,
     sources: ['blocket', 'bostadsportal', 'qasa', 'hyresratter', 'lkf', 'afbostader'],
   });

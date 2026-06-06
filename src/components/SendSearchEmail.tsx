@@ -20,12 +20,18 @@ interface Props {
 
 async function fetchRealListings(filters: FilterValues): Promise<Listing[]> {
   const params = new URLSearchParams({
-    minPrice: String(filters.minPrice),
-    maxPrice: String(filters.maxPrice),
-    minRooms: String(filters.minRooms),
-    maxRooms: String(filters.maxRooms),
-    furnished: String(filters.furnished),
-    petFriendly: String(filters.petFriendly),
+    minPrice:       String(filters.minPrice),
+    maxPrice:       String(filters.maxPrice),
+    minRooms:       String(filters.minRooms),
+    maxRooms:       String(filters.maxRooms),
+    minArea:        String(filters.minArea),
+    maxArea:        String(filters.maxArea),
+    maxPricePerSqm: String(filters.maxPricePerSqm || 0),
+    furnished:      String(filters.furnished),
+    petFriendly:    String(filters.petFriendly),
+    leaseType:      filters.leaseType || 'all',
+    availableFrom:  filters.availableFrom || '',
+    selectedAreas:  (filters.selectedAreas || []).join(','),
   });
 
   const res = await fetch(`/api/listings?${params.toString()}`);

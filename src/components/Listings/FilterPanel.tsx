@@ -8,9 +8,12 @@ export interface FilterValues {
   maxRooms: number;
   minArea: number;
   maxArea: number;
+  maxPricePerSqm: number;        // NEW: max kr/m²
   selectedAreas: string[];
   petFriendly: boolean;
   furnished: boolean;
+  leaseType: 'all' | 'long_term' | 'short_term'; // NEW: kontraktstyp
+  availableFrom: string;         // NEW: tillgänglig från (YYYY-MM-DD)
   sources: string[];
 }
 
@@ -21,10 +24,13 @@ const DEFAULT: FilterValues = {
   maxRooms: 5,
   minArea: 0,
   maxArea: 150,
+  maxPricePerSqm: 0,
   selectedAreas: [],
   petFriendly: false,
   furnished: false,
-  sources: ['blocket', 'bostadsportal', 'qasa', 'hyresratter', 'lkf', 'afbostader', 'facebook'],
+  leaseType: 'all',
+  availableFrom: '',
+  sources: ['blocket', 'bostadsportal', 'qasa', 'hyresratter', 'lkf', 'afbostader'],
 };
 
 const SOURCE_OPTIONS = [
@@ -34,7 +40,6 @@ const SOURCE_OPTIONS = [
   { id: 'bostadsportal', label: 'Bostadsportal',  live: true },
   { id: 'hyresratter',   label: 'Hyresrätter',    live: true },
   { id: 'blocket',       label: 'Blocket',        live: false },
-  { id: 'facebook',      label: 'Facebook',       live: false },
 ];
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -70,8 +75,11 @@ export function FilterPanel({ onFilterChange }: FilterPanelProps) {
     (f.minPrice > 0 || f.maxPrice < 20000 ? 1 : 0) +
     (f.minRooms > 1 || f.maxRooms < 5 ? 1 : 0) +
     (f.minArea > 0 || f.maxArea < 150 ? 1 : 0) +
+    (f.maxPricePerSqm > 0 ? 1 : 0) +
     (f.petFriendly ? 1 : 0) +
-    (f.furnished ? 1 : 0);
+    (f.furnished ? 1 : 0) +
+    (f.leaseType !== 'all' ? 1 : 0) +
+    (f.availableFrom ? 1 : 0);
 
   const reset = () => { setF(DEFAULT); onFilterChange(DEFAULT); };
 
@@ -109,14 +117,28 @@ export function FilterPanel({ onFilterChange }: FilterPanelProps) {
             <div className="grid grid-cols-2 gap-2">
               <input type="number" value={f.minPrice} min={0} max={f.maxPrice} step={500}
                 onChange={e => update({ minPrice: +e.target.value })}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1c2b3a] focus:border-transparent"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1c2b3a]"
                 placeholder="Min kr" />
               <input type="number" value={f.maxPrice} min={f.minPrice} max={30000} step={500}
                 onChange={e => update({ maxPrice: +e.target.value })}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1c2b3a] focus:border-transparent"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1c2b3a]"
                 placeholder="Max kr" />
             </div>
           </div>
+        </Section>
+
+        {/* Max kr/m² */}
+        <Section title="Max hyra per m²">
+          <div className="flex items-center gap-2">
+            <input type="number" value={f.maxPricePerSqm || ''} min={0} max={500} step={10}
+              onChange={e => update({ maxPricePerSqm: +e.target.value })}
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1c2b3a]"
+              placeholder="t.ex. 200 kr/m²" />
+            <span className="text-xs text-gray-400 whitespace-nowrap">kr/m²</span>
+          </div>
+          {f.maxPricePerSqm > 0 && (
+            <p className="text-xs text-gray-400 mt-1">Max {f.maxPricePerSqm} kr/m² (60 m² = max {(f.maxPricePerSqm * 60).toLocaleString('sv-SE')} kr)</p>
+          )}
         </Section>
 
         {/* Rum */}
@@ -133,9 +155,7 @@ export function FilterPanel({ onFilterChange }: FilterPanelProps) {
                     else update({ minRooms: n, maxRooms: n });
                   }}
                   className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${
-                    active
-                      ? 'bg-[#1c2b3a] text-white'
-                      : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-100'
+                    active ? 'bg-[#1c2b3a] text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-100'
                   }`}>
                   {n === 5 ? '5+' : n}
                 </button>
@@ -149,13 +169,48 @@ export function FilterPanel({ onFilterChange }: FilterPanelProps) {
           <div className="grid grid-cols-2 gap-2">
             <input type="number" value={f.minArea} min={0} max={f.maxArea} step={5}
               onChange={e => update({ minArea: +e.target.value })}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1c2b3a] focus:border-transparent"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1c2b3a]"
               placeholder="Min m²" />
             <input type="number" value={f.maxArea} min={f.minArea} max={300} step={5}
               onChange={e => update({ maxArea: +e.target.value })}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1c2b3a] focus:border-transparent"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1c2b3a]"
               placeholder="Max m²" />
           </div>
+        </Section>
+
+        {/* Kontraktstyp */}
+        <Section title="Kontraktstyp">
+          <div className="flex gap-1.5">
+            {[
+              { id: 'all', label: 'Alla' },
+              { id: 'long_term', label: 'Förstahand' },
+              { id: 'short_term', label: 'Andrahand' },
+            ].map(opt => (
+              <button key={opt.id}
+                onClick={() => update({ leaseType: opt.id as FilterValues['leaseType'] })}
+                className={`flex-1 py-2 rounded-lg text-xs font-medium transition ${
+                  f.leaseType === opt.id ? 'bg-[#1c2b3a] text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-100'
+                }`}>
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </Section>
+
+        {/* Tillgänglig från */}
+        <Section title="Tillgänglig från">
+          <input
+            type="date"
+            value={f.availableFrom}
+            min={new Date().toISOString().split('T')[0]}
+            onChange={e => update({ availableFrom: e.target.value })}
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1c2b3a]"
+          />
+          {f.availableFrom && (
+            <button onClick={() => update({ availableFrom: '' })} className="text-xs text-gray-400 hover:text-red-400 mt-1">
+              Rensa datum
+            </button>
+          )}
         </Section>
 
         {/* Områden */}
@@ -166,9 +221,7 @@ export function FilterPanel({ onFilterChange }: FilterPanelProps) {
               return (
                 <button key={area.id} onClick={() => toggleArea(area.name)} title={area.description}
                   className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${
-                    sel
-                      ? 'bg-[#1c2b3a] text-white'
-                      : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-100'
+                    sel ? 'bg-[#1c2b3a] text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-100'
                   }`}>
                   {area.name}
                 </button>
@@ -211,9 +264,7 @@ export function FilterPanel({ onFilterChange }: FilterPanelProps) {
               return (
                 <label key={src.id} className="flex items-center gap-3 cursor-pointer group">
                   <div className={`w-5 h-5 rounded flex items-center justify-center transition border ${
-                    sel
-                      ? 'bg-[#1c2b3a] border-[#1c2b3a]'
-                      : 'bg-white border-gray-300 group-hover:border-gray-500'
+                    sel ? 'bg-[#1c2b3a] border-[#1c2b3a]' : 'bg-white border-gray-300 group-hover:border-gray-500'
                   }`}
                     onClick={() => toggleSource(src.id)}>
                     {sel && (
