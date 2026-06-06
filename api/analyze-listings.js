@@ -1,52 +1,14 @@
 // Vercel Serverless Function - uses Claude API to analyze and prioritize listings
 
-import Anthropic from '@anthropic-ai/sdk';
-
-interface Listing {
-  id: string;
-  title: string;
-  price: number;
-  rooms?: number;
-  area?: number;
-  pricePerSqm?: number;
-  furnished?: boolean;
-  petFriendly?: boolean;
-  imageUrl?: string;
-  url: string;
-  source: string;
-  listedAt?: string;
-}
-
-interface FilterValues {
-  minPrice: number;
-  maxPrice: number;
-  minRooms: number;
-  maxRooms: number;
-  minArea: number;
-  maxArea: number;
-  maxPricePerSqm?: number;
-  selectedAreas: string[];
-  petFriendly: boolean;
-  furnished: boolean;
-  leaseType?: string;
-  availableFrom?: string;
-}
-
-interface AnalysisResult {
-  listings: (Listing & {
-    priority: number;
-    reason: string;
-    highlights: string[];
-  })[];
-  summary: string;
-  topRecommendation?: string;
-}
-
-export default async function handler(req: any, res: any) {
+export default async function handler(req, res) {
+  // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(200).end();
+  
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -71,7 +33,7 @@ export default async function handler(req: any, res: any) {
       console.error('Missing ANTHROPIC_API_KEY environment variable');
       // Fallback: return listings with basic priority if API key missing
       return res.status(200).json({
-        listings: listings.map((l: Listing, idx: number) => ({
+        listings: listings.map((l, idx) => ({
           ...l,
           priority: listings.length - idx,
           reason: 'Sorterad efter nyaste först',
@@ -81,13 +43,15 @@ export default async function handler(req: any, res: any) {
       });
     }
 
+    // Import Anthropic SDK
+    const { default: Anthropic } = await import('@anthropic-ai/sdk');
     const client = new Anthropic({ apiKey });
 
     // Build context for Claude
     const filterSummary = buildFilterSummary(filters);
     const listingsText = listings
       .slice(0, 30) // Limit to top 30 to avoid token overload
-      .map((l: Listing, i: number) =>
+      .map((l, i) =>
         `${i + 1}. ${l.title}\n   Hyra: ${l.price} kr/mån | ${l.rooms} rum | ${l.area} m² | ${l.pricePerSqm} kr/m²\n   Möblerad: ${l.furnished ? 'Ja' : 'Nej'} | Husdjur: ${l.petFriendly ? 'Ja' : 'Nej'}\n   URL: ${l.url}`
       )
       .join('\n\n');
@@ -146,34 +110,33 @@ Svara i JSON-format:
 
     const analysis = JSON.parse(jsonMatch[0]);
 
-    // Merge analysis results back with full listing data
-    const enhancedListings = listings.map((listing: Listing) => {
-      const analysis_item = analysis.analyses?.find((a: any) => a.id === listing.id) ||
-                           analysis.analyses?.[listings.indexOf(listing)];
+    // Merge analysis results back with full listing data (using index-based matching)
+    const enhancedListings = listings.map((listing, idx) => {
+      const analysis_item = analysis.analyses?.[idx];
       return {
         ...listing,
-        priority: analysis_item?.priority || listings.length - listings.indexOf(listing),
+        priority: analysis_item?.priority || idx + 1,
         reason: analysis_item?.reason || 'AI-analys ej tillgänglig',
         highlights: analysis_item?.highlights || buildHighlights(listing)
       };
     });
 
     // Sort by priority
-    enhancedListings.sort((a: any, b: any) => a.priority - b.priority);
+    enhancedListings.sort((a, b) => a.priority - b.priority);
 
     res.status(200).json({
       listings: enhancedListings,
       summary: analysis.summary || `Hittade ${listings.length} matchande bostäder`,
       topRecommendation: analysis.topRecommendation
-    } as AnalysisResult);
+    });
 
-  } catch (err: any) {
+  } catch (err) {
     console.error('Analysis API error:', err);
     // Graceful fallback - return listings with basic analysis
     const { listings } = req.body;
     if (listings && Array.isArray(listings)) {
       return res.status(200).json({
-        listings: listings.map((l: Listing, idx: number) => ({
+        listings: listings.map((l, idx) => ({
           ...l,
           priority: listings.length - idx,
           reason: 'Sorterad efter nyaste först',
@@ -186,8 +149,8 @@ Svara i JSON-format:
   }
 }
 
-function buildFilterSummary(filters: FilterValues): string {
-  const parts: string[] = [];
+function buildFilterSummary(filters) {
+  const parts = [];
 
   if (filters.minPrice > 0 || filters.maxPrice < 20000) {
     parts.push(`Hyra: ${filters.minPrice}-${filters.maxPrice} kr/mån`);
@@ -218,8 +181,8 @@ function buildFilterSummary(filters: FilterValues): string {
   return parts.length > 0 ? parts.join('\n') : 'Alla bostäder';
 }
 
-function buildHighlights(listing: Listing): string[] {
-  const highlights: string[] = [];
+function buildHighlights(listing) {
+  const highlights = [];
 
   // Price insight
   if (listing.pricePerSqm) {
